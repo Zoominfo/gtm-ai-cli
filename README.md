@@ -1,41 +1,82 @@
 # GTM AI CLI
 
-A command-line interface for the [ZoomInfo](https://www.zoominfo.com/) GTM AI MCP server. Search and enrich companies and contacts, surface intent signals and news, manage GTM context, and pipe results through your shell as JSON, JSONL, CSV, YAML, or a table.
-
-> **Status:** working end-to-end against `mcp.zoominfo.com`. The OAuth client name is currently `GTM AI CLI` — pending the ZI MCP team adding it to the DCR vendor allowlist. Until that lands, the first `gtm auth login` returns `"Vendor with name GTM AI CLI was not found in approved vendors"`. See `src/oauth.ts:17` for the handshake.
+A command-line interface for searching [ZoomInfo](https://www.zoominfo.com/) go-to-market (GTM) data. 
+Search and enrich companies and contacts, surface intent signals and news, manage GTM context, and pipe results 
+through your shell as JSON, JSONL, CSV, YAML, or a table.
 
 ## Installation
 
-### From source (Node 18+)
+### Homebrew (macOS and Linux)
 
-```bash
-git clone https://github.com/zoominfo/gtm-ai-cli.git
-cd gtm-ai-cli
-npm install
-npm run build:ts
-npm link        # makes `gtm` available globally
+The easiest way to install the GTM CLI on MacOS or Linux is using [Homebrew](https://brew.sh/).  
+
+```shell
+brew install zoominfo/gtm-ai/gtm-ai-cli
 ```
 
-### Homebrew (coming soon)
+To upgrade to the latest version, run
 
-```bash
-# planned once binary releases are signed and published
-brew install zoominfo/gtm-ai-cli/gtm-ai-cli
+```shell
+brew upgrade gtm-ai-cli
+```
+
+### NPM
+
+For Windows users or users unable to use Homebrew, you can also install the GTM CLI through NPM
+or any other node package installer (yarn, bun, etc.)
+
+Ensure that you install it as a **global** package
+
+```shell
+npm install -g @zoominfo/gtm-ai-cli
+```
+
+### Download a Prebuilt Binary
+
+Download the latest binary from the [releases](https://github.com/Zoominfo/gtm-ai-cli/releases) page for your platform.
+The platforms supported by this tool are:
+* macOS w/ Apple Silicon (arm64)
+* macOS w/ Intel processor (x64)
+* Linux
+* Windows
+
+Make the downloaded package executable and place it on your PATH
+
+**macOS and Linux**
+```shell
+chmod +x gtm-macos-arm64
+mv gtm-macos-arm64 /usr/local/bin/gtm
+xattr -d com.apple.quarantine /usr/local/bin/apollo #only required on macOS
+```
+
+**Windows**
+```powershell
+Move-Item .\gtm-windows-x64.exe "$env:USERPROFILE\bin\gtm.exe"
+```
+
+### From source (Node 18+)
+
+```shell
+git clone https://github.com/Zoominfo/gtm-ai-cli.git
+cd gtm-ai-cli
+npm install
+npm run build
+npm link        # makes `gtm` available globally
 ```
 
 ## Authentication
 
 OAuth 2.0 + PKCE via your browser. Tokens are saved to `~/.config/gtm-ai/` at mode `0600`.
 
-```bash
+```shell
 gtm auth login    # opens browser to authorize, saves token
-gtm auth whoami   # show login status + token expiry
+gtm auth whoami   # show login status
 gtm auth logout   # revoke token and remove saved credentials
 ```
 
 If you ever need a clean slate (e.g. to re-trigger DCR), remove the saved client:
 
-```bash
+```shell
 rm ~/.config/gtm-ai/client_id ~/.config/gtm-ai/credentials
 gtm auth login
 ```
@@ -52,7 +93,7 @@ Every subcommand accepts `-f, --format`. The `table` and `csv` formats auto-flat
 | `yaml` | Human-readable diffs of deeply nested responses. |
 | `table` | ASCII bordered table. Best for terminal browsing of small responses. |
 
-```bash
+```shell
 gtm companies search --industry software -f table
 gtm contacts search --management-level "C Level Exec" -f jsonl > c-level-contacts.jsonl
 gtm-context get -f yaml
@@ -65,7 +106,7 @@ dotted paths to project from each record, applied before formatting. Handy for n
 quick scans without `jq`. (Distinct from the enrich commands' `--fields`, which selects which
 fields ZoomInfo returns server-side.)
 
-```bash
+```shell
 gtm companies search --industry software --page-size 5 --select id,name,revenue -f table
 gtm companies search --industry software --select name,company.id -f csv > orgs.csv
 ```
@@ -78,7 +119,7 @@ gtm companies search --industry software --select name,company.id -f csv > orgs.
 
 ZoomInfo's search endpoints reject unknown industry/metro/topic strings with 422. **Always look up the canonical ID first**, then pass it to the search filters.
 
-```bash
+```shell
 # Industries containing "software"
 gtm lookup --field industries --fuzzy software -f table
 
@@ -104,7 +145,7 @@ Valid `--field` names: `industries`, `metro-regions`, `states`, `countries`, `co
 
 **Search.** Requires at least one filter.
 
-```bash
+```shell
 # By name
 gtm companies search --name "ZoomInfo"
 
@@ -126,7 +167,7 @@ gtm companies search --naics "541511,541512"
 
 **Enrich.** Provide any identifier:
 
-```bash
+```shell
 gtm companies enrich --id 344589814
 gtm companies enrich --domain stripe.com
 gtm companies enrich --name "Stripe"
@@ -143,7 +184,7 @@ gtm companies enrich --file companies.json
 
 **Similar companies** (machine-learning ranked list of look-alikes):
 
-```bash
+```shell
 gtm companies similar --id 344589814
 gtm companies similar --name "Stripe"
 ```
@@ -154,7 +195,7 @@ gtm companies similar --name "Stripe"
 
 **Search.** Requires at least one filter.
 
-```bash
+```shell
 # By name
 gtm contacts search --first-name Henry --last-name Schuck
 
@@ -174,7 +215,7 @@ gtm contacts search --management-level "VP Level Exec" --department Sales --accu
 
 **Enrich.** Provide any valid identifier combination — `personId` (most accurate), `email`, `phone`, or `firstName + lastName + (company OR companyId)`:
 
-```bash
+```shell
 gtm contacts enrich --id 1260398587
 gtm contacts enrich --email henry@zoominfo.com
 gtm contacts enrich --phone 555-303-1234
@@ -191,14 +232,14 @@ gtm contacts enrich --file contacts.json
 
 **Similar contacts** (find people who look like a reference person; optionally constrain to a target company):
 
-```bash
+```shell
 gtm contacts similar --person-id 1260398587
 gtm contacts similar --person-id 1260398587 --company-id 239305146   # similar contacts within Salesforce
 ```
 
 **Recommended contacts** at a target company, based on your interaction history:
 
-```bash
+```shell
 gtm contacts recommended --company-id 344589814 --use-case PROSPECTING
 gtm contacts recommended --company-id 344589814 --use-case DEAL_ACCELERATION
 gtm contacts recommended --company-id 344589814 --use-case RENEWAL_AND_GROWTH
@@ -210,7 +251,7 @@ gtm contacts recommended --company-id 344589814 --use-case RENEWAL_AND_GROWTH
 
 Every request needs `--topics` (1-50). Look up exact topic names first.
 
-```bash
+```shell
 gtm lookup --field intent-topics --fuzzy "data warehouse"
 
 # Companies showing high intent for Cloud Applications + Java
@@ -227,7 +268,7 @@ gtm intent search --topics "AI Agents" --audience-strength-min B --audience-stre
 
 **Enrich** — pull intent signals for a specific company:
 
-```bash
+```shell
 gtm intent enrich --company-id 344589814 --topics "Cloud Applications" "Java"
 gtm intent enrich --name "ZoomInfo" --topics "AI Agents" --signal-score-min 70
 gtm intent enrich --website https://www.stripe.com --topics "Payments"
@@ -239,7 +280,7 @@ gtm intent enrich --website https://www.stripe.com --topics "Payments"
 
 Scoops capture earnings, funding, M&A, leadership moves, layoffs, product launches, awards, partnerships, and more. Search requires at least one filter.
 
-```bash
+```shell
 # Funding announcements at SF software companies in May 2026
 gtm scoops search --scoop-types Funding --industry software --metro "MA - Boston" \
   --published-start 2026-05-01 --published-end 2026-05-31
@@ -256,7 +297,7 @@ gtm scoops search --scoop-types "Product Launch" --description "artificial intel
 
 **Enrich** — get scoops for a specific company:
 
-```bash
+```shell
 gtm scoops enrich --company-id 344589814 --scoop-types "New Hire" Promotion
 gtm scoops enrich --name "Stripe" --published-start 2026-01-01
 ```
@@ -267,7 +308,7 @@ gtm scoops enrich --name "Stripe" --published-start 2026-01-01
 
 `enrich_news` is currently the only news tool. Requires `--company-id`.
 
-```bash
+```shell
 # Recent funding/financial news for ZoomInfo
 gtm news enrich --company-id 344589814 --categories FINANCIAL_RESULTS FUNDING
 
@@ -286,7 +327,7 @@ Valid `--categories`: `FINANCIAL_RESULTS`, `FUNDING`, `GENERAL_NEWS`, `GENERAL_P
 
 This is the context that shapes how every other ZoomInfo tool interprets your queries — your offerings, ICPs, buyer personas, competitors, strategic priorities. Zero credits consumed.
 
-```bash
+```shell
 # Compressed view (~1k tokens)
 gtm-context get
 
@@ -304,7 +345,7 @@ gtm-context update --query "Create buyer personas from these interviews" --sourc
 
 ### `gtm feedback` — submit feedback to ZoomInfo
 
-```bash
+```shell
 gtm feedback submit --category DATA_QUALITY --message "Henry Schuck's company should be ZoomInfo Technologies, not ZoomInfo"
 gtm feedback submit --category FEATURE_REQUEST --message "Want a --csv-headers flag to control column order"
 ```
@@ -319,7 +360,7 @@ Natural-language research that blends ZoomInfo market data with your CRM and con
 history. Frame the goal in `--query` (the tool decides what to retrieve) rather than passing
 keywords. Get the ZoomInfo IDs from `gtm companies search` / `gtm contacts search`.
 
-```bash
+```shell
 # Company/account research
 gtm research account --company-id 344589814 \
   --query "Prepping for a renewal call — relationship status, recent news, and open risks"
@@ -335,7 +376,7 @@ gtm research contact --contact-id 1260398587 \
 
 Use this when you need a tool that doesn't have a curated wrapper yet.
 
-```bash
+```shell
 # What tools does the MCP server expose?
 gtm raw list-tools -f table
 
@@ -350,7 +391,7 @@ gtm raw call search_intent --args '{"topics":["Cloud Applications"],"signalScore
 
 ### Pipe to `jq` for field extraction
 
-```bash
+```shell
 # Just the company names from a search
 gtm companies search --industry software --metro "CA - San Francisco" | jq '.data[].attributes.name'
 
@@ -363,7 +404,7 @@ gtm intent search --topics "Cloud Applications" --signal-score-min 80 | jq '.dat
 
 ### Two-step: search companies, enrich top results
 
-```bash
+```shell
 # Get top 3 company IDs, then enrich each with full details
 gtm companies search --industry software --metro "CA - San Francisco" --page-size 3 -f json \
   | jq -r '.data[].id' \
@@ -372,13 +413,13 @@ gtm companies search --industry software --metro "CA - San Francisco" --page-siz
 
 ### Export contacts to CSV
 
-```bash
+```shell
 gtm contacts search --management-level "VP Level Exec" --department Sales --company-id 344589814 -f csv > vp-sales.csv
 ```
 
 ### Find lookalike companies, then enrich them
 
-```bash
+```shell
 gtm companies similar --id 344589814 -f json \
   | jq -r '.data[0:10][].id' \
   | xargs -I{} gtm companies enrich --id {} --fields name domain employeeCount revenue industries
@@ -388,7 +429,7 @@ gtm companies similar --id 344589814 -f json \
 
 ## Development
 
-```bash
+```shell
 npm install
 npm run typecheck                          # tsc --noEmit
 npm test                                   # unit tests (Vitest, mocked)
@@ -402,14 +443,14 @@ The live suite (`src/live/`) drives the built CLI against the real MCP server, c
 read-only command end-to-end (it skips when you're not logged in). Run it against the compiled
 output and opt into the mutating tier explicitly:
 
-```bash
+```shell
 GTM_CLI_CMD="node dist/js/index.js" npm run test:live           # read-only (default)
 GTM_LIVE_WRITES=1 GTM_CLI_CMD="node dist/js/index.js" npm run test:live   # + feedback / gtm-context update
 ```
 
 Build standalone single-file binaries (requires [Bun](https://bun.sh)):
 
-```bash
+```shell
 npm run build                              # → dist/gtm (current platform)
 npm run build:all                          # cross-compile macOS arm64/x64, Linux x64, Windows x64
 ```
@@ -424,4 +465,4 @@ https://raw.githubusercontent.com/zoominfo/gtm-ai-cli/main/.claude/skills/gtm-ai
 
 ## License
 
-TBD — pending ZoomInfo legal review.
+MIT
