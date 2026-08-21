@@ -26,6 +26,12 @@ export function parseRange(input: string): { min: string; max: string } {
   return { min: min ?? '', max: max ?? '' };
 }
 
+// Splits a CLI-facing comma or " OR "-separated string into a trimmed, non-empty array.
+// Used to adapt legacy comma/OR-syntax flags onto v2 MCP tool params that expect typed arrays.
+export function splitList(input: string): string[] {
+  return input.split(/,| OR /i).map(s => s.trim()).filter(Boolean);
+}
+
 const NON_FILTER_KEYS = new Set(['page', 'pageSize', 'sort']);
 
 // Exits with a helpful error if the built MCP args contain only paging/sort keys.

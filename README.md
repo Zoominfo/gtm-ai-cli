@@ -150,19 +150,19 @@ Valid `--field` names: `industries`, `metro-regions`, `states`, `countries`, `co
 gtm companies search --name "ZoomInfo"
 
 # Tech companies in San Francisco with 100-500 employees
-gtm companies search --industry software --metro "CA - San Francisco" --employees "100to249,250to499"
+gtm companies search --industry software --metro "CA - San Francisco" --employees-min 100 --employees-max 500
 
 # Public US companies with $1B+ revenue, sorted by revenue desc
 gtm companies search --type public --country "United States" --revenue-min 1000000 --sort -revenue --page-size 10 -f table
 
 # Companies using a specific tech product (lookup product IDs first)
-gtm companies search --tech "5f1d1d5c123" --metro "MA - Boston" --employees "250to499,500to999"
+gtm companies search --tech "5f1d1d5c123" --metro "MA - Boston" --employees-min 250 --employees-max 999
 
-# Series A-B funded ($1M-$20M) software companies in the US
-gtm companies search --industry software --country "United States" --funding-min 1000 --funding-max 20000
+# Software companies in the US whose most recent funding round was Series A or B
+gtm companies search --industry software --country "United States" --recent-funding-types "Series A" "Series B"
 
-# By NAICS / SIC codes
-gtm companies search --naics "541511,541512"
+# By explicit ZoomInfo company IDs
+gtm companies search --ids 344589814 12345
 ```
 
 **Enrich.** Provide any identifier:
@@ -200,7 +200,7 @@ gtm companies similar --name "Stripe"
 gtm contacts search --first-name Henry --last-name Schuck
 
 # By job title (free-text OR queries supported)
-gtm contacts search --job-title "CFO OR VP Finance OR Treasurer" --employees "1000to4999,5000to9999"
+gtm contacts search --job-title "CFO OR VP Finance OR Treasurer" --employees-min 1000
 
 # C-level and VP-level executives at a specific company
 gtm contacts search --management-level "C Level Exec,VP Level Exec" --company-id 344589814
@@ -266,13 +266,7 @@ gtm intent search --topics "Mobile Apps" --signal-score-min 80 \
 gtm intent search --topics "AI Agents" --audience-strength-min B --audience-strength-max A
 ```
 
-**Enrich** — pull intent signals for a specific company:
-
-```shell
-gtm intent enrich --company-id 344589814 --topics "Cloud Applications" "Java"
-gtm intent enrich --name "ZoomInfo" --topics "AI Agents" --signal-score-min 70
-gtm intent enrich --website https://www.stripe.com --topics "Payments"
-```
+To pull intent signals for a specific company, use `gtm signals enrich` (see below).
 
 ---
 
@@ -295,31 +289,27 @@ gtm scoops search --scoop-types Layoffs --employees "10000plus" --published-star
 gtm scoops search --scoop-types "Product Launch" --description "artificial intelligence" --published-start 2026-04-01
 ```
 
-**Enrich** — get scoops for a specific company:
-
-```shell
-gtm scoops enrich --company-id 344589814 --scoop-types "New Hire" Promotion
-gtm scoops enrich --name "Stripe" --published-start 2026-01-01
-```
+To get scoops for a specific company, use `gtm signals enrich` (see below).
 
 ---
 
-### `gtm news` — news articles
+### `gtm signals` — unified company signals (intent, news, scoops)
 
-`enrich_news` is currently the only news tool. Requires `--company-id`.
+`enrich_company_signals` replaces the now-deprecated `enrich_intent`, `enrich_news`, and `enrich_scoops` tools —
+fetch intent, news, and scoop signals for up to 10 companies in a single call.
 
 ```shell
-# Recent funding/financial news for ZoomInfo
-gtm news enrich --company-id 344589814 --categories FINANCIAL_RESULTS FUNDING
+# All signal types for two companies
+gtm signals enrich --company-id 344589814 12345
 
-# Product news in the last quarter
-gtm news enrich --company-id 344589814 --categories PRODUCT --publishing-start 2026-03-01 --publishing-end 2026-05-31
+# Only intent + news signals for one company
+gtm signals enrich --company-id 344589814 --types INTENT NEWS
 
-# Leadership news (appointments, departures)
-gtm news enrich --company-id 344589814 --categories PERSON
+# Just scoops
+gtm signals enrich --company-id 344589814 --types SCOOP -f table
 ```
 
-Valid `--categories`: `FINANCIAL_RESULTS`, `FUNDING`, `GENERAL_NEWS`, `GENERAL_PRESS_RELEASE`, `MERGER_OR_ACQUISITION`, `PERSON`, `PRODUCT`.
+Valid `--types`: `INTENT`, `NEWS`, `SCOOP` (omit to get all three, sorted by latest date).
 
 ---
 
