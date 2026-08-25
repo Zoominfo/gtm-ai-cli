@@ -23,11 +23,12 @@ import { registerRaw } from './commands/raw.js';
 import { registerResearch } from './commands/research.js';
 import { registerScoops } from './commands/scoops.js';
 import { closeClient } from './mcp.js';
+import { resolveProgramName } from './utils.js';
 
 const program = new Command();
 
 program
-  .name('gtm')
+  .name(resolveProgramName(process.argv))
   .description('Command-line interface for the ZoomInfo GTM AI MCP server\n\nGlobal flags:\n  -d, --debug   Log MCP tool calls and responses to stderr (also: GTM_DEBUG=1)')
   .version(pkg.version);
 

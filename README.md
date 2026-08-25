@@ -14,6 +14,8 @@ The easiest way to install the GTM CLI on MacOS or Linux is using [Homebrew](htt
 brew install zoominfo/gtm-ai/gtm-ai-cli
 ```
 
+> **Heads-up:** the unrelated [Git Time Metric](https://github.com/git-time-metric/gtm) project also ships a `gtm` binary via Homebrew — always install with the tap-qualified name above, not a bare `brew install gtm`.
+
 To upgrade to the latest version, run
 
 ```shell
@@ -31,6 +33,8 @@ Ensure that you install it as a **global** package
 npm install -g @zoominfo/gtm-ai-cli
 ```
 
+This installs the canonical `gtm` command plus a `zoominfo` alias — every command works identically under either name (e.g. `zoominfo companies search`). These docs use `gtm` throughout.
+
 ### Download a Prebuilt Binary
 
 Download the latest binary from the [releases](https://github.com/Zoominfo/gtm-ai-cli/releases) page for your platform.
@@ -46,7 +50,7 @@ Make the downloaded package executable and place it on your PATH
 ```shell
 chmod +x gtm-macos-arm64
 mv gtm-macos-arm64 /usr/local/bin/gtm
-xattr -d com.apple.quarantine /usr/local/bin/apollo #only required on macOS
+xattr -d com.apple.quarantine /usr/local/bin/gtm #only required on macOS
 ```
 
 **Windows**
@@ -61,7 +65,7 @@ git clone https://github.com/Zoominfo/gtm-ai-cli.git
 cd gtm-ai-cli
 npm install
 npm run build
-npm link        # makes `gtm` available globally
+npm link        # makes `gtm` (and its alias `zoominfo`) available globally
 ```
 
 ## Authentication

@@ -11,7 +11,8 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "gtm": "dist/index.js"
+    "gtm": "dist/index.js",
+    "zoominfo": "dist/index.js"
   },
   "files": [
     "dist/index.js",
