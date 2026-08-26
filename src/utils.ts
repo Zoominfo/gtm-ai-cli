@@ -1,4 +1,17 @@
+import { basename } from 'node:path';
 import type { PageOptions } from './types.js';
+
+// `zoominfo` is a compat alias for the canonical `gtm` bin (both package.json bin
+// entries point at the same entrypoint). Help/usage text mirrors whichever name was
+// invoked so `zoominfo --help` doesn't print `Usage: gtm`. We check argv[1] (npm bin
+// shim path) and argv[0] (compiled-binary path); anything unrecognized — dev runs,
+// tests, Windows .cmd shims that re-invoke node with the script path — falls back to
+// `gtm`. Guidance strings elsewhere (e.g. "Run: gtm auth login") stay canonical.
+export function resolveProgramName(argv: readonly string[]): 'gtm' | 'zoominfo' {
+  return argv.slice(0, 2).some(p => p && basename(p).toLowerCase().startsWith('zoominfo'))
+    ? 'zoominfo'
+    : 'gtm';
+}
 
 export interface PageOptionInput {
   page?: string;
