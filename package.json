@@ -1,6 +1,6 @@
 {
   "name": "@zoominfo/gtm-ai-cli",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "A command-line tool for searching ZoomInfo's go-to-market data",
   "repository": "https://github.com/Zoominfo/gtm-ai-cli",
   "author": {
