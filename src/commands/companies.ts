@@ -2,32 +2,27 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters } from '../utils.js';
+import { requireSearchFilters, splitList } from '../utils.js';
 
 interface CompaniesSearchOptions {
   name?: string;
   domain?: string;
+  ids?: string[];
   industry?: string;
   metro?: string;
   state?: string;
   country?: string;
   continent?: string;
   zip?: string;
-  employees?: string;
   employeesMin?: string;
   employeesMax?: string;
-  revenue?: string;
   revenueMin?: string;
   revenueMax?: string;
   type?: string;
   ticker?: string[];
   tech?: string;
-  naics?: string;
-  sic?: string;
-  fundingMin?: string;
-  fundingMax?: string;
-  fundingStart?: string;
-  fundingEnd?: string;
+  recentFundingTypes?: string[];
+  allFundingTypes?: string[];
   sort?: string;
   page?: string;
   pageSize?: string;
@@ -55,34 +50,29 @@ interface CompaniesSimilarOptions {
   select?: string;
 }
 
-// Pure mapping from CLI flags to MCP search_companies arguments.
+// Pure mapping from CLI flags to MCP search_companies_v2 arguments.
 // Exported so unit tests can hit it without a network.
 export function buildCompaniesSearchArgs(opts: CompaniesSearchOptions): Record<string, unknown> {
   const args: Record<string, unknown> = {};
 
   if (opts.name) args.companyName = opts.name;
   if (opts.domain) args.companyWebsite = opts.domain;
-  if (opts.industry) args.industryCodes = opts.industry;
+  if (opts.ids && opts.ids.length > 0) args.companyIdList = opts.ids.map(id => parseInt(id, 10));
+  if (opts.industry) args.industryList = splitList(opts.industry);
   if (opts.metro) args.metroRegion = opts.metro;
   if (opts.state) args.state = opts.state;
   if (opts.country) args.country = opts.country;
   if (opts.continent) args.continent = opts.continent;
   if (opts.zip) args.zipCode = opts.zip;
-  if (opts.employees) args.employeeCount = opts.employees;
-  if (opts.employeesMin) args.employeeRangeMin = opts.employeesMin;
-  if (opts.employeesMax) args.employeeRangeMax = opts.employeesMax;
-  if (opts.revenue) args.revenue = opts.revenue;
+  if (opts.employeesMin) args.employeeRangeMin = parseInt(opts.employeesMin, 10);
+  if (opts.employeesMax) args.employeeRangeMax = parseInt(opts.employeesMax, 10);
   if (opts.revenueMin) args.revenueMin = parseInt(opts.revenueMin, 10);
   if (opts.revenueMax) args.revenueMax = parseInt(opts.revenueMax, 10);
-  if (opts.type) args.companyType = opts.type;
-  if (opts.ticker) args.companyTicker = opts.ticker;
-  if (opts.tech) args.techAttributeTagList = opts.tech;
-  if (opts.naics) args.naicsCodes = opts.naics;
-  if (opts.sic) args.sicCodes = opts.sic;
-  if (opts.fundingMin) args.fundingAmountMin = parseInt(opts.fundingMin, 10);
-  if (opts.fundingMax) args.fundingAmountMax = parseInt(opts.fundingMax, 10);
-  if (opts.fundingStart) args.fundingStartDate = opts.fundingStart;
-  if (opts.fundingEnd) args.fundingEndDate = opts.fundingEnd;
+  if (opts.type) args.companyTypeList = splitList(opts.type);
+  if (opts.ticker) args.companyTickerList = opts.ticker;
+  if (opts.tech) args.techAttributeTagList = splitList(opts.tech);
+  if (opts.recentFundingTypes) args.recentFundingRoundTypes = opts.recentFundingTypes;
+  if (opts.allFundingTypes) args.allFundingRoundTypes = opts.allFundingTypes;
   if (opts.sort) args.sort = opts.sort;
   if (opts.page) args.page = parseInt(opts.page, 10);
   if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
@@ -110,27 +100,22 @@ export function registerCompanies(program: Command): void {
     .description("Search ZoomInfo's company database")
     .option('--name <name>', 'Company name')
     .option('--domain <url>', 'Company website (https://example.com)')
+    .option('--ids <companyIds...>', 'ZoomInfo company IDs')
     .option('--industry <codes>', 'Industry codes (comma-separated) — use `gtm lookup --field industries` for valid values')
     .option('--metro <regions>', 'Metro regions (comma-separated) — use `gtm lookup --field metro-regions`')
     .option('--state <states>', 'State or province (comma-separated)')
     .option('--country <countries>', 'Country (comma-separated)')
     .option('--continent <continents>', 'Continent (comma-separated)')
     .option('--zip <code>', 'Zip / postal code')
-    .option('--employees <ranges>', 'Employee count ranges, e.g. "100to249,250to499"')
-    .option('--employees-min <n>', 'Minimum employee count (granular)')
-    .option('--employees-max <n>', 'Maximum employee count (granular)')
-    .option('--revenue <ranges>', 'Revenue ranges, e.g. "1Mto5M,10Mto25M"')
+    .option('--employees-min <n>', 'Minimum employee count')
+    .option('--employees-max <n>', 'Maximum employee count')
     .option('--revenue-min <thousands>', 'Min annual revenue in thousands')
     .option('--revenue-max <thousands>', 'Max annual revenue in thousands')
-    .option('--type <type>', 'Company type: private, public, npo, education, government, other')
+    .option('--type <types>', 'Company type(s), comma-separated: private, public, npo, education, government, other')
     .option('--ticker <symbols...>', 'Stock ticker symbols')
     .option('--tech <productIds>', 'Tech product IDs (comma-separated) — use lookup tech-products')
-    .option('--naics <codes>', 'NAICS codes (comma-separated)')
-    .option('--sic <codes>', 'SIC codes (comma-separated)')
-    .option('--funding-min <thousands>', 'Min funding amount in thousands')
-    .option('--funding-max <thousands>', 'Max funding amount in thousands')
-    .option('--funding-start <YYYY-MM-DD>', 'Funding window start')
-    .option('--funding-end <YYYY-MM-DD>', 'Funding window end')
+    .option('--recent-funding-types <types...>', 'Match companies whose most recent funding round is one of these types')
+    .option('--all-funding-types <types...>', 'Match companies that have ever had a funding round of one of these types')
     .option('--sort <field>', 'Sort: name | employeeCount | revenue (prefix - for descending)')
     .option('--page <n>', 'Page number', '1')
     .option('--page-size <n>', 'Results per page (max 100)', '25')
@@ -143,11 +128,11 @@ export function registerCompanies(program: Command): void {
         '--domain <url>           Company website (https://example.com)',
         '--industry <codes>       Industry codes (use `gtm lookup --field industries`)',
         '--metro <regions>        Metro regions (use `gtm lookup --field metro-regions`)',
-        '--employees <ranges>     Employee count ranges (e.g. "100to249,250to499")',
-        '--revenue <ranges>       Revenue ranges (e.g. "1Mto5M,10Mto25M")',
+        '--employees-min/-max <n> Employee count range (e.g. --employees-min 100 --employees-max 500)',
+        '--revenue-min/-max <n>   Annual revenue range in thousands',
         '--tech <productIds>      Tech product IDs (use `gtm lookup --field tech-products`)',
       ]);
-      const data = await mcpCall('search_companies', args);
+      const data = await mcpCall('search_companies_v2', args);
       print(data, opts.format, opts.select);
     });
 

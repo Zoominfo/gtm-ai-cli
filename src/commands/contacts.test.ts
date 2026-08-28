@@ -6,7 +6,7 @@ describe('buildContactsSearchArgs', () => {
     expect(buildContactsSearchArgs({})).toEqual({});
   });
 
-  it('maps contact-specific flags to MCP arg names', () => {
+  it('maps contact-specific flags to MCP arg names, splitting lists into arrays', () => {
     expect(buildContactsSearchArgs({
       firstName: 'Jane',
       lastName: 'Doe',
@@ -18,37 +18,55 @@ describe('buildContactsSearchArgs', () => {
       firstName: 'Jane',
       lastName: 'Doe',
       emailAddress: 'jane@acme.com',
-      jobTitle: 'VP Engineering',
-      managementLevel: 'VP Level Exec',
-      department: 'Engineering & Technical',
+      jobTitleList: ['VP Engineering'],
+      managementLevelList: ['VP Level Exec'],
+      departmentList: ['Engineering & Technical'],
     });
   });
 
-  it('maps company filters through with website renamed', () => {
+  it('splits " OR "-joined job titles as well as comma-joined ones', () => {
+    expect(buildContactsSearchArgs({ jobTitle: 'CFO OR VP Finance OR Treasurer' })).toEqual({
+      jobTitleList: ['CFO', 'VP Finance', 'Treasurer'],
+    });
+  });
+
+  it('maps company filters through, converting company-id to an integer array', () => {
     expect(buildContactsSearchArgs({
-      companyId: '12345',
+      companyId: '12345,67890',
       companyName: 'Acme',
       companyDomain: 'https://acme.com',
     })).toEqual({
-      companyId: '12345',
+      companyIdList: [12345, 67890],
       companyName: 'Acme',
       companyWebsite: 'https://acme.com',
     });
   });
 
-  it('coerces accuracy + paging flags to numbers/booleans correctly', () => {
+  it('coerces accuracy + range + paging flags to integers', () => {
     expect(buildContactsSearchArgs({
       accuracyMin: '80',
       accuracyMax: '99',
-      executivesOnly: true,
+      employeesMin: '100',
+      employeesMax: '500',
+      revenueMin: '1000',
+      revenueMax: '5000',
       page: '3',
       pageSize: '50',
     })).toEqual({
-      contactAccuracyScoreMin: '80',
-      contactAccuracyScoreMax: '99',
-      executivesOnly: true,
+      contactAccuracyScoreMin: 80,
+      contactAccuracyScoreMax: 99,
+      employeeRangeMin: 100,
+      employeeRangeMax: 500,
+      revenueMin: 1000,
+      revenueMax: 5000,
       page: 3,
       pageSize: 50,
+    });
+  });
+
+  it('splits the required-fields flag into an array', () => {
+    expect(buildContactsSearchArgs({ required: 'email,phone' })).toEqual({
+      requiredFieldsList: ['email', 'phone'],
     });
   });
 });

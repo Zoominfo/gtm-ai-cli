@@ -29,24 +29,6 @@ interface ScoopsSearchOptions {
   select?: string;
 }
 
-interface ScoopsEnrichOptions {
-  companyId?: string[];
-  name?: string;
-  websites?: string[];
-  scoopTypes?: string[];
-  scoopTopics?: string[];
-  department?: string[];
-  description?: string;
-  publishedStart?: string;
-  publishedEnd?: string;
-  updatedSinceCreation?: boolean;
-  sort?: string;
-  page?: string;
-  pageSize?: string;
-  format?: string;
-  select?: string;
-}
-
 export function buildScoopsSearchArgs(opts: ScoopsSearchOptions): Record<string, unknown> {
   const args: Record<string, unknown> = {};
 
@@ -111,48 +93,6 @@ export function registerScoops(program: Command): void {
         '--industry <codes...>        Industry codes (use `gtm lookup --field industries`)',
       ]);
       const data = await mcpCall('search_scoops', args);
-      print(data, opts.format, opts.select);
-    });
-
-  scoops
-    .command('enrich')
-    .description('Fetch scoops for a specific company')
-    .option('--company-id <ids...>', 'ZoomInfo company ID(s)')
-    .option('--name <name>', 'Company name')
-    .option('--websites <urls...>', 'Company website URLs')
-    .option('--scoop-types <types...>')
-    .option('--scoop-topics <ids...>')
-    .option('--department <depts...>')
-    .option('--description <words>')
-    .option('--published-start <YYYY-MM-DD>')
-    .option('--published-end <YYYY-MM-DD>')
-    .option('--updated-since-creation')
-    .option('--sort <field>')
-    .option('--page <n>', 'Page number', '1')
-    .option('--page-size <n>', 'Results per page', '25')
-    .option(...FORMAT_OPTION)
-    .option(...SELECT_OPTION)
-    .action(async (opts: ScoopsEnrichOptions) => {
-      if (!opts.companyId && !opts.name && !opts.websites) {
-        console.error('Error: provide --company-id, --name, or --websites');
-        process.exit(1);
-      }
-      const args: Record<string, unknown> = {};
-      if (opts.companyId) args.zoominfoCompanyIds = opts.companyId;
-      if (opts.name) args.companyName = opts.name;
-      if (opts.websites) args.companyWebsites = opts.websites;
-      if (opts.scoopTypes) args.scoopTypes = opts.scoopTypes;
-      if (opts.scoopTopics) args.scoopTopics = opts.scoopTopics;
-      if (opts.department) args.department = opts.department;
-      if (opts.description) args.description = opts.description;
-      if (opts.publishedStart) args.publishedStartDate = opts.publishedStart;
-      if (opts.publishedEnd) args.publishedEndDate = opts.publishedEnd;
-      if (opts.updatedSinceCreation) args.updatedSinceCreation = true;
-      if (opts.sort) args.sort = opts.sort;
-      if (opts.page) args.page = parseInt(opts.page, 10);
-      if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
-
-      const data = await mcpCall('enrich_scoops', args);
       print(data, opts.format, opts.select);
     });
 }

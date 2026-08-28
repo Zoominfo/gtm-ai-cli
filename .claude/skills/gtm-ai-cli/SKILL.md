@@ -63,13 +63,13 @@ The response is keyed by field name: `.<fieldName>.data[]` where each entry is `
 
 ```bash
 gtm companies search --name "ZoomInfo"
-gtm companies search --industry software --metro "CA - San Francisco" --employees "100to249,250to499"
+gtm companies search --industry software --metro "CA - San Francisco" --employees-min 100 --employees-max 500
 gtm companies search --type public --country "United States" --revenue-min 1000000 --sort -revenue --page-size 10
 gtm companies search --tech "<tech_product_id>" --metro "MA - Boston"
-gtm companies search --naics "541511,541512"
+gtm companies search --ids 344589814 12345
 ```
 
-Common filters: `--name`, `--domain`, `--industry`, `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--naics`, `--sic`, `--funding-min`/`-max`, `--funding-start`/`-end`, `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
+Common filters: `--name`, `--domain`, `--ids`, `--industry`, `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--employees-min`/`-max`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--recent-funding-types`, `--all-funding-types`, `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
 
 **Enrich.** Provide any identifier (most accurate: `--id`).
 
@@ -99,13 +99,13 @@ gtm companies similar --name "Stripe"   # less accurate; CLI resolves a best-mat
 
 ```bash
 gtm contacts search --first-name Henry --last-name Schuck
-gtm contacts search --job-title "CFO OR VP Finance OR Treasurer" --employees "1000to4999,5000to9999"
+gtm contacts search --job-title "CFO OR VP Finance OR Treasurer" --employees-min 1000
 gtm contacts search --management-level "C Level Exec,VP Level Exec" --company-id 344589814
 gtm contacts search --management-level Manager --department "Engineering & Technical" --industry software --metro "CA - San Francisco" --required email,phone
 gtm contacts search --management-level "VP Level Exec" --department Sales --accuracy-min 90
 ```
 
-Common filters: `--first-name`, `--last-name`, `--full-name`, `--email`, `--job-title` (free-text OR queries OK), `--exact-job-title`, `--management-level` (canonical names only — use lookup), `--department`, `--job-function`, `--company-id`, `--company-name`, `--company-domain`, `--industry`, `--metro`, `--state`, `--country`, `--employees`, `--revenue`, `--tech`, `--accuracy-min`/`-max` (70-99), `--required` (subset of `email,phone,directPhone,mobilePhone,personalEmail`), `--executives-only`, `--sort`, `--page`, `--page-size`.
+Common filters: `--first-name`, `--last-name`, `--full-name`, `--email`, `--job-title` (free-text OR queries OK), `--management-level` (canonical names only — use lookup), `--department`, `--job-function`, `--company-id`, `--company-name`, `--company-domain`, `--industry`, `--metro`, `--state`, `--country`, `--employees-min`/`-max`, `--revenue-min`/`-max`, `--tech`, `--accuracy-min`/`-max` (70-99), `--required` (subset of `email,phone,directPhone,mobilePhone,personalEmail`), `--sort`, `--page`, `--page-size`.
 
 **Enrich.** Valid identifier combinations:
 
@@ -155,13 +155,7 @@ gtm intent search --topics "Mobile Apps" --signal-score-min 80 --signal-start 20
 gtm intent search --topics "AI Agents" --audience-strength-min B --audience-strength-max A
 ```
 
-**Enrich** — fetch intent for a specific company:
-
-```bash
-gtm intent enrich --company-id 344589814 --topics "Cloud Applications" "Java"
-gtm intent enrich --name "ZoomInfo" --topics "AI Agents" --signal-score-min 70
-gtm intent enrich --website https://www.stripe.com --topics "Payments"
-```
+To fetch intent for a specific company, use `gtm signals enrich` (see below).
 
 Signal scores range 60-100 (higher = stronger interest). Audience strength is A-E (A = largest audience researching). Use `--audience-strength-min E --audience-strength-max A` to include all; tighter ranges narrow to bigger groups.
 
@@ -178,25 +172,20 @@ gtm scoops search --scoop-types "Product Launch" --description "artificial intel
 
 Valid `--scoop-types`: `Earnings`, `Funding`, `Initial Public Offering (IPO)`, `Mergers & Acquisitions (M&A)`, `Divestiture`, `Award`, `Event`, `Facilities Relocation / Expansion`, `Product Launch`, `Partnership`, `Hiring Plans`, `Open Position`, `New Hire`, `Lateral Move`, `Promotion`, `Left Company`, `Layoffs`, `Management Move`, `Executive Move`, `Pain Point`, `Project`, `Commentary`, `Person-Based`.
 
-**Enrich** — get scoops for a specific company:
+To get scoops for a specific company, use `gtm signals enrich` (see below).
+
+### Company signals
+
+`gtm signals enrich` replaces the deprecated `intent enrich` / `news enrich` / `scoops enrich` tools —
+`enrich_company_signals` fetches intent, news, and scoop signals for up to 10 companies in one call.
 
 ```bash
-gtm scoops enrich --company-id 344589814 --scoop-types "New Hire" Promotion
-gtm scoops enrich --name "Stripe" --published-start 2026-01-01
-gtm scoops enrich --websites https://www.zoominfo.com https://www.salesforce.com
+gtm signals enrich --company-id 344589814 12345                    # all three signal types
+gtm signals enrich --company-id 344589814 --types INTENT NEWS      # restrict to a subset
+gtm signals enrich --company-id 344589814 --types SCOOP -f table
 ```
 
-### News
-
-Currently only enrich (no search). Requires `--company-id` (integer).
-
-```bash
-gtm news enrich --company-id 344589814 --categories FINANCIAL_RESULTS FUNDING
-gtm news enrich --company-id 344589814 --categories PRODUCT --publishing-start 2026-03-01 --publishing-end 2026-05-31
-gtm news enrich --company-id 344589814 --categories PERSON
-```
-
-Valid `--categories`: `FINANCIAL_RESULTS`, `FUNDING`, `GENERAL_NEWS`, `GENERAL_PRESS_RELEASE`, `MERGER_OR_ACQUISITION`, `PERSON`, `PRODUCT`.
+Valid `--types`: `INTENT`, `NEWS`, `SCOOP` (omit to get all three, sorted by latest date). Requires 1-10 company IDs.
 
 ### GTM Context
 
@@ -287,7 +276,7 @@ gtm companies search --industry "$INDUSTRY_IDS" --metro "CA - San Francisco"
 
 > **Doing many calls? Pick the cheapest option in this order:**
 >
-> 1. **Native bulk (`--file`) — preferred.** `enrich` accepts up to 10 identifiers in a single MCP call, so there's no loop and no rate concern. Use it whenever you're enriching a set. (Only `enrich` has bulk mode — `search`/`similar`/`scoops`/`intent`/`news` are single-call per invocation.)
+> 1. **Native bulk (`--file`) — preferred.** `enrich` accepts up to 10 identifiers in a single MCP call, so there's no loop and no rate concern. Use it whenever you're enriching a set. (Only `enrich` has bulk mode — `search`/`similar`/`scoops`/`intent`/`signals` are single-call per invocation.)
 >     ```bash
 >     gtm companies enrich --file ./companies.json   # up to 10 in one round trip
 >     gtm contacts enrich  --file ./contacts.json
@@ -347,9 +336,9 @@ Every MCP search/enrich endpoint returns JSON:API shape (`{ data: [...], meta: {
 | `companies enrich` | `.data[]` (one per input) | `{ attributes: { …enriched fields per --fields }, id, type:"Company" }` |
 | `contacts search` / `similar` / `recommended` | `.data[]` | `{ attributes: { firstName, lastName, jobTitle, email, phone, managementLevel, company:{id,name}, hasEmail, hasPhone, … }, id, type:"Contact" }` |
 | `contacts enrich` | `.data[]` (one per input) | `{ attributes: { …enriched fields per --fields }, id, type:"Contact" }` |
-| `intent search` / `enrich` | `.data[]` | `{ attributes: { topic, score, audienceStrength, signalDate, companyName, companyId, … }, id, type:"Intent" }` |
-| `scoops search` / `enrich` | `.data[]` | `{ attributes: { scoopType, description, link, originalPublishedDate, companyName, … }, id, type:"Scoop" }` |
-| `news enrich` | `.data[]` | `{ attributes: { title, url, publishingDate, category, snippet, … }, id, type:"NewsArticle" }` |
+| `intent search` | `.data[]` | `{ attributes: { topic, score, audienceStrength, signalDate, companyName, companyId, … }, id, type:"Intent" }` |
+| `scoops search` | `.data[]` | `{ attributes: { scoopType, description, link, originalPublishedDate, companyName, … }, id, type:"Scoop" }` |
+| `signals enrich` | `.data[]` | mixed per requested `--types`: `{ attributes: {…}, id, type:"Intent"\|"Scoop"\|"NewsArticle" }` |
 | `lookup` | `.<fieldName>.data[]` | `{ attributes: { name }, id, type }` — **pass `id` (not `attributes.name`) into search filters** |
 | `gtm-context get` | `.result` | `{ user, organization, buyerPersonas:[…], idealCustomerProfiles:[…], competitors:[…], offerings:[…] }` |
 | `gtm-context update` | `.result` | varies by update operation |

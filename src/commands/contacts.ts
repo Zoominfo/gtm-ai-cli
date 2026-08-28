@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters } from '../utils.js';
+import { requireSearchFilters, splitList } from '../utils.js';
 
 interface ContactsSearchOptions {
   firstName?: string;
@@ -10,7 +10,6 @@ interface ContactsSearchOptions {
   fullName?: string;
   email?: string;
   jobTitle?: string;
-  exactJobTitle?: string;
   managementLevel?: string;
   department?: string;
   jobFunction?: string;
@@ -21,13 +20,14 @@ interface ContactsSearchOptions {
   metro?: string;
   state?: string;
   country?: string;
-  employees?: string;
-  revenue?: string;
+  employeesMin?: string;
+  employeesMax?: string;
+  revenueMin?: string;
+  revenueMax?: string;
   tech?: string;
   accuracyMin?: string;
   accuracyMax?: string;
   required?: string;
-  executivesOnly?: boolean;
   sort?: string;
   page?: string;
   pageSize?: string;
@@ -75,25 +75,25 @@ export function buildContactsSearchArgs(opts: ContactsSearchOptions): Record<str
   if (opts.lastName) args.lastName = opts.lastName;
   if (opts.fullName) args.fullName = opts.fullName;
   if (opts.email) args.emailAddress = opts.email;
-  if (opts.jobTitle) args.jobTitle = opts.jobTitle;
-  if (opts.exactJobTitle) args.exactJobTitle = opts.exactJobTitle;
-  if (opts.managementLevel) args.managementLevel = opts.managementLevel;
-  if (opts.department) args.department = opts.department;
-  if (opts.jobFunction) args.jobFunction = opts.jobFunction;
-  if (opts.companyId) args.companyId = opts.companyId;
+  if (opts.jobTitle) args.jobTitleList = splitList(opts.jobTitle);
+  if (opts.managementLevel) args.managementLevelList = splitList(opts.managementLevel);
+  if (opts.department) args.departmentList = splitList(opts.department);
+  if (opts.jobFunction) args.jobFunctionList = splitList(opts.jobFunction);
+  if (opts.companyId) args.companyIdList = splitList(opts.companyId).map(id => parseInt(id, 10));
   if (opts.companyName) args.companyName = opts.companyName;
   if (opts.companyDomain) args.companyWebsite = opts.companyDomain;
-  if (opts.industry) args.industryCodes = opts.industry;
+  if (opts.industry) args.industryList = splitList(opts.industry);
   if (opts.metro) args.metroRegion = opts.metro;
   if (opts.state) args.state = opts.state;
   if (opts.country) args.country = opts.country;
-  if (opts.employees) args.employeeCount = opts.employees;
-  if (opts.revenue) args.revenue = opts.revenue;
-  if (opts.tech) args.techAttributeTagList = opts.tech;
-  if (opts.accuracyMin) args.contactAccuracyScoreMin = opts.accuracyMin;
-  if (opts.accuracyMax) args.contactAccuracyScoreMax = opts.accuracyMax;
-  if (opts.required) args.requiredFields = opts.required;
-  if (opts.executivesOnly) args.executivesOnly = true;
+  if (opts.employeesMin) args.employeeRangeMin = parseInt(opts.employeesMin, 10);
+  if (opts.employeesMax) args.employeeRangeMax = parseInt(opts.employeesMax, 10);
+  if (opts.revenueMin) args.revenueMin = parseInt(opts.revenueMin, 10);
+  if (opts.revenueMax) args.revenueMax = parseInt(opts.revenueMax, 10);
+  if (opts.tech) args.techAttributeTagList = splitList(opts.tech);
+  if (opts.accuracyMin) args.contactAccuracyScoreMin = parseInt(opts.accuracyMin, 10);
+  if (opts.accuracyMax) args.contactAccuracyScoreMax = parseInt(opts.accuracyMax, 10);
+  if (opts.required) args.requiredFieldsList = splitList(opts.required);
   if (opts.sort) args.sort = opts.sort;
   if (opts.page) args.page = parseInt(opts.page, 10);
   if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
@@ -126,25 +126,25 @@ export function registerContacts(program: Command): void {
     .option('--last-name <name>')
     .option('--full-name <name>')
     .option('--email <email>')
-    .option('--job-title <titles>', 'Job titles (use OR for multiple: "CFO OR VP Finance")')
-    .option('--exact-job-title <titles>', 'Exact job title match')
+    .option('--job-title <titles>', 'Job titles (comma or " OR " separated: "CFO OR VP Finance")')
     .option('--management-level <levels>', 'C Level Exec | VP Level Exec | Director | Manager | Non Manager | Board Member (comma-separated)')
     .option('--department <depts>', 'Department(s) — use `gtm lookup --field departments` for valid values')
     .option('--job-function <funcs>', 'Job function(s)')
-    .option('--company-id <id>', 'ZoomInfo company ID(s) — comma-separated')
+    .option('--company-id <ids>', 'ZoomInfo company ID(s) — comma-separated')
     .option('--company-name <name>')
     .option('--company-domain <url>', 'Company website URL')
     .option('--industry <codes>', 'Industry codes (comma-separated) — use lookup industries')
     .option('--metro <regions>', 'Metro regions (comma-separated)')
     .option('--state <states>')
     .option('--country <countries>')
-    .option('--employees <ranges>', 'Employee count ranges, e.g. "100to249,250to499"')
-    .option('--revenue <ranges>', 'Revenue ranges, e.g. "1Mto5M,10Mto25M"')
+    .option('--employees-min <n>', 'Minimum employee count (of the contact\'s company)')
+    .option('--employees-max <n>', 'Maximum employee count (of the contact\'s company)')
+    .option('--revenue-min <thousands>', 'Min annual revenue in thousands (of the contact\'s company)')
+    .option('--revenue-max <thousands>', 'Max annual revenue in thousands (of the contact\'s company)')
     .option('--tech <productIds>', 'Tech product IDs (comma-separated)')
     .option('--accuracy-min <score>', 'Minimum contact accuracy score (70-99)')
     .option('--accuracy-max <score>', 'Maximum contact accuracy score (70-99)')
     .option('--required <fields>', 'Required fields: email | phone | directPhone | mobilePhone | personalEmail (comma-separated)')
-    .option('--executives-only', 'Only return executives')
     .option('--sort <field>', 'Sort field (prefix - for descending). e.g. -contactAccuracyScore')
     .option('--page <n>', 'Page number', '1')
     .option('--page-size <n>', 'Results per page (max 100)', '25')
@@ -155,14 +155,14 @@ export function registerContacts(program: Command): void {
       requireSearchFilters(args, 'gtm contacts search', [
         '--full-name <name>           Full name (or --first-name + --last-name)',
         '--email <email>              Email address',
-        '--job-title <titles>         Job titles (use OR for multiple: "CFO OR VP Finance")',
+        '--job-title <titles>         Job titles (comma or " OR " separated: "CFO OR VP Finance")',
         '--management-level <levels>  C Level Exec | VP Level Exec | Director | Manager | Non Manager',
         '--company-id <id>            ZoomInfo company ID (use `gtm companies search` to find one)',
         '--company-name <name>        Company name',
         '--industry <codes>           Industry codes (use `gtm lookup --field industries`)',
         '--metro <regions>            Metro regions (use `gtm lookup --field metro-regions`)',
       ]);
-      const data = await mcpCall('search_contacts', args);
+      const data = await mcpCall('search_contacts_v2', args);
       print(data, opts.format, opts.select);
     });
 
