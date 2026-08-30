@@ -1,12 +1,12 @@
 ---
 name: gtm-ai-cli
-description: This skill should be used when searching for or enriching companies and contacts, surfacing buyer intent signals, fetching real-time business events (scoops) or company news, reading or updating GTM context (offerings, ICPs, personas, competitors), looking up reference values (industries, metros, intent topics, tech products), or doing any ZoomInfo / GTM data lookup from the terminal. Activates when the user asks to "find companies", "search contacts", "enrich a contact", "find lookalike companies", "research a company / person", "get intent signals", "find scoops", "fetch company news", "show our GTM context", "look up industry codes", or any task involving ZoomInfo data lookup from the terminal.
-version: 0.1.0
+description: This skill should be used when searching for or enriching companies and contacts, surfacing buyer intent signals, fetching real-time business events (scoops) or company news, browsing engagement history (meetings, emails) or asking conversation-intelligence questions, reading or updating GTM context (offerings, ICPs, personas, competitors), looking up reference values (industries, metros, intent topics, tech products), or doing any ZoomInfo / GTM data lookup from the terminal. Activates when the user asks to "find companies", "search contacts", "enrich a contact", "find lookalike companies", "research a company / person", "get intent signals", "find scoops", "fetch company news", "what's happening at this account", "what did they say on the call", "show our GTM context", "look up industry codes", or any task involving ZoomInfo data lookup from the terminal.
+version: 0.2.0
 ---
 
 # GTM AI CLI Skill
 
-Use the `gtm` CLI to drive ZoomInfo's GTM AI MCP from the terminal: search and enrich companies and contacts, surface intent signals, find real-time business events (scoops), pull news, read/update your organization's GTM context, and look up reference values. Output defaults to JSON for `jq` piping; use `-f, --format` to switch to `jsonl`, `csv`, `yaml`, or `table`.
+Use the `gtm` CLI to drive ZoomInfo's GTM AI MCP from the terminal: search and enrich companies and contacts, surface intent signals, find real-time business events (scoops), pull per-company signals (intent + news + scoops), browse engagements and ask conversation-intelligence questions, read/update your organization's GTM context, and look up reference values. Output defaults to JSON for `jq` piping; use `-f, --format` to switch to `jsonl`, `csv`, `yaml`, or `table`.
 
 ## Authentication
 
@@ -69,7 +69,7 @@ gtm companies search --tech "<tech_product_id>" --metro "MA - Boston"
 gtm companies search --naics "541511,541512"
 ```
 
-Common filters: `--name`, `--domain`, `--industry`, `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--naics`, `--sic`, `--funding-min`/`-max`, `--funding-start`/`-end`, `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
+Common filters: `--name`, `--domain`, `--industry` (lookup `id` values, e.g. `software.health`), `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--zip-radius` (10|25|50|100|250 miles), `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--naics`, `--sic`, `--funding-min`/`-max`, `--funding-start`/`-end`, `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
 
 **Enrich.** Provide any identifier (most accurate: `--id`).
 
@@ -105,7 +105,13 @@ gtm contacts search --management-level Manager --department "Engineering & Techn
 gtm contacts search --management-level "VP Level Exec" --department Sales --accuracy-min 90
 ```
 
-Common filters: `--first-name`, `--last-name`, `--full-name`, `--email`, `--job-title` (free-text OR queries OK), `--exact-job-title`, `--management-level` (canonical names only — use lookup), `--department`, `--job-function`, `--company-id`, `--company-name`, `--company-domain`, `--industry`, `--metro`, `--state`, `--country`, `--employees`, `--revenue`, `--tech`, `--accuracy-min`/`-max` (70-99), `--required` (subset of `email,phone,directPhone,mobilePhone,personalEmail`), `--executives-only`, `--sort`, `--page`, `--page-size`.
+Common filters: `--first-name`, `--last-name`, `--full-name`, `--email`, `--job-title` (free-text OR queries OK), `--exact-job-title`, `--management-level` (canonical names only — use lookup), `--department`, `--job-function`, `--company-id`, `--company-name`, `--company-domain`, `--industry` (lookup `id` values, e.g. `software.health`), `--metro`, `--state`, `--country`, `--zip`, `--zip-radius` (10|25|50|100|250 miles), `--location-type`, `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--tech`, `--accuracy-min`/`-max` (70-99), `--required` (subset of `email,phone,directPhone,mobilePhone,personalEmail`), `--sort`, `--page`, `--page-size`.
+
+**`--location-type` matters for any geographic list build** — it scopes the location filters to where the *person* is vs. where the company *HQ* is: `Person` | `HQ` | `PersonOrHQ` | `PersonAndHQ` | `PersonThenHQ`. Requires at least one location filter. E.g. Boston *residents* vs. Boston-*HQ* companies:
+
+```bash
+gtm contacts search --job-title "CFO" --metro "MA - Boston" --location-type Person
+```
 
 **Enrich.** Valid identifier combinations:
 
@@ -155,15 +161,9 @@ gtm intent search --topics "Mobile Apps" --signal-score-min 80 --signal-start 20
 gtm intent search --topics "AI Agents" --audience-strength-min B --audience-strength-max A
 ```
 
-**Enrich** — fetch intent for a specific company:
-
-```bash
-gtm intent enrich --company-id 344589814 --topics "Cloud Applications" "Java"
-gtm intent enrich --name "ZoomInfo" --topics "AI Agents" --signal-score-min 70
-gtm intent enrich --website https://www.stripe.com --topics "Payments"
-```
-
 Signal scores range 60-100 (higher = stronger interest). Audience strength is A-E (A = largest audience researching). Use `--audience-strength-min E --audience-strength-max A` to include all; tighter ranges narrow to bigger groups.
+
+For intent signals on a *specific* company, use `gtm signals --company-ids <id> --types INTENT` (see Signals below).
 
 ### Scoops (real-time business events)
 
@@ -178,25 +178,40 @@ gtm scoops search --scoop-types "Product Launch" --description "artificial intel
 
 Valid `--scoop-types`: `Earnings`, `Funding`, `Initial Public Offering (IPO)`, `Mergers & Acquisitions (M&A)`, `Divestiture`, `Award`, `Event`, `Facilities Relocation / Expansion`, `Product Launch`, `Partnership`, `Hiring Plans`, `Open Position`, `New Hire`, `Lateral Move`, `Promotion`, `Left Company`, `Layoffs`, `Management Move`, `Executive Move`, `Pain Point`, `Project`, `Commentary`, `Person-Based`.
 
-**Enrich** — get scoops for a specific company:
+For scoops on a *specific* company, use `gtm signals --company-ids <id> --types SCOOP` (see Signals below).
+
+### Signals — per-company intent + news + scoops
+
+One call gets the latest signals across all three categories for up to 10 companies (ideal for "what's happening at these accounts"). This replaces the former `gtm intent enrich`, `gtm scoops enrich`, and `gtm news enrich`.
 
 ```bash
-gtm scoops enrich --company-id 344589814 --scoop-types "New Hire" Promotion
-gtm scoops enrich --name "Stripe" --published-start 2026-01-01
-gtm scoops enrich --websites https://www.zoominfo.com https://www.salesforce.com
+gtm signals --company-ids 344589814                                    # everything, sorted by latest date
+gtm signals --company-ids 344589814 --types NEWS                       # just news
+gtm signals --company-ids 344589814 239305146 --types INTENT SCOOP     # batch, intent + scoops
 ```
 
-### News
+Response shape is `{ results: [{ company, signals: [...] }] }` (not JSON:API) — each signal has `signalType` (`intent` | `news` | `scoop`), `date`, `summary`, and type-specific `details`. Charges data credits for companies not under management.
 
-Currently only enrich (no search). Requires `--company-id` (integer).
+### Engagements & conversation intelligence
+
+Requires the org to have a calendar / email / meeting provider integrated with ZoomInfo. `list` consumes no data credits.
 
 ```bash
-gtm news enrich --company-id 344589814 --categories FINANCIAL_RESULTS FUNDING
-gtm news enrich --company-id 344589814 --categories PRODUCT --publishing-start 2026-03-01 --publishing-end 2026-05-31
-gtm news enrich --company-id 344589814 --categories PERSON
+gtm engagements list --limit 10                                        # default window: last 7 days → 7 days ahead
+gtm engagements list --company-id 344589814 --type MEETINGS --sort -chronological
+gtm engagements list --start 2026-06-01T00:00:00Z --end 2026-08-01T00:00:00Z   # ISO 8601, max 90-day window
 ```
 
-Valid `--categories`: `FINANCIAL_RESULTS`, `FUNDING`, `GENERAL_NEWS`, `GENERAL_PRESS_RELEASE`, `MERGER_OR_ACQUISITION`, `PERSON`, `PRODUCT`.
+**Ask** — natural-language questions over calls, meetings, and emails. Scope to *exactly one* of `--engagement-id`, `--company-id`, or `--contact-id`:
+
+```bash
+gtm engagements ask --company-id 344589814 --query "What concerns has this account raised recently?"
+gtm engagements ask --contact-id 1260398587 --query "What has this person told us they care about?"
+gtm engagements ask --engagement-id "<abc123@mail.example.com>" --query "What were the main objections?"
+gtm engagements ask --engagement-id "abc123" --query "Summarize this call" --include-content   # append raw transcript (engagement scope only, can be huge)
+```
+
+Engagement IDs are opaque strings from `gtm engagements list` — quote them verbatim (some contain literal angle brackets). Account/contact scope samples the 5 most recent meetings + 5 most recent emails; for deeper coverage, drill into cited engagement IDs.
 
 ### GTM Context
 
@@ -222,12 +237,11 @@ Categories: `DATA_QUALITY`, `FEATURE_REQUEST`, `ACCESS_ENTITLEMENT_ISSUE`, `OTHE
 
 ### Raw — universal escape hatch
 
-Use when you need a tool that doesn't have a curated wrapper (currently: `account_research`, `contact_research`).
+Use when you need a tool that doesn't have a curated wrapper (currently the GTM Studio audience tools: `browse_audiences`, `get_audience`, `upsert_audience`, `manage_audience_columns`, `manage_audience_rows`, `query_audience_analysis_agent`).
 
 ```bash
 gtm raw list-tools -f table                                                          # show every MCP tool the server exposes
-gtm raw call account_research --args '{"companyId":"344589814"}'
-gtm raw call contact_research --args '{"personId":"1260398587"}'
+gtm raw call browse_audiences --args '{"pageSize":10}'
 gtm raw call find_similar_companies --args '{"companyName":"Stripe"}'
 ```
 
@@ -347,9 +361,11 @@ Every MCP search/enrich endpoint returns JSON:API shape (`{ data: [...], meta: {
 | `companies enrich` | `.data[]` (one per input) | `{ attributes: { …enriched fields per --fields }, id, type:"Company" }` |
 | `contacts search` / `similar` / `recommended` | `.data[]` | `{ attributes: { firstName, lastName, jobTitle, email, phone, managementLevel, company:{id,name}, hasEmail, hasPhone, … }, id, type:"Contact" }` |
 | `contacts enrich` | `.data[]` (one per input) | `{ attributes: { …enriched fields per --fields }, id, type:"Contact" }` |
-| `intent search` / `enrich` | `.data[]` | `{ attributes: { topic, score, audienceStrength, signalDate, companyName, companyId, … }, id, type:"Intent" }` |
-| `scoops search` / `enrich` | `.data[]` | `{ attributes: { scoopType, description, link, originalPublishedDate, companyName, … }, id, type:"Scoop" }` |
-| `news enrich` | `.data[]` | `{ attributes: { title, url, publishingDate, category, snippet, … }, id, type:"NewsArticle" }` |
+| `intent search` | `.data[]` | `{ attributes: { topic, score, audienceStrength, signalDate, companyName, companyId, … }, id, type:"Intent" }` |
+| `scoops search` | `.data[]` | `{ attributes: { scoopType, description, link, originalPublishedDate, companyName, … }, id, type:"Scoop" }` |
+| `signals` | `.results[]` | `{ company: { zoominfoCompanyId, name, website }, signals: [{ signalType, date, summary, details }] }` — **not** JSON:API |
+| `engagements list` | top-level | `{ accounts: [...], emails: { data: [...] }, meetings: { data: [...] } }` — **not** JSON:API |
+| `engagements ask` | varies | natural-language answer with citations — fall back to `-f yaml` to inspect |
 | `lookup` | `.<fieldName>.data[]` | `{ attributes: { name }, id, type }` — **pass `id` (not `attributes.name`) into search filters** |
 | `gtm-context get` | `.result` | `{ user, organization, buyerPersonas:[…], idealCustomerProfiles:[…], competitors:[…], offerings:[…] }` |
 | `gtm-context update` | `.result` | varies by update operation |

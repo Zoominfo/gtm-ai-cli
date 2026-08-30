@@ -14,14 +14,15 @@ import { pkg } from './pkg.js';
 import { registerAuth } from './commands/auth.js';
 import { registerCompanies } from './commands/companies.js';
 import { registerContacts } from './commands/contacts.js';
+import { registerEngagements } from './commands/engagements.js';
 import { registerFeedback } from './commands/feedback.js';
 import { registerGtm } from './commands/gtm.js';
 import { registerIntent } from './commands/intent.js';
 import { registerLookup } from './commands/lookup.js';
-import { registerNews } from './commands/news.js';
 import { registerRaw } from './commands/raw.js';
 import { registerResearch } from './commands/research.js';
 import { registerScoops } from './commands/scoops.js';
+import { registerSignals } from './commands/signals.js';
 import { closeClient } from './mcp.js';
 import { resolveProgramName } from './utils.js';
 
@@ -35,14 +36,15 @@ program
 registerAuth(program);
 registerCompanies(program);
 registerContacts(program);
+registerEngagements(program);
 registerFeedback(program);
 registerGtm(program);
 registerIntent(program);
 registerLookup(program);
-registerNews(program);
 registerRaw(program);
 registerResearch(program);
 registerScoops(program);
+registerSignals(program);
 
 program.addHelpCommand(false);
 program.addCommand(
