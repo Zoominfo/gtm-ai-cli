@@ -414,6 +414,48 @@ gtm engagements ask --engagement-id "abc123" --query "Summarize this call" --inc
 
 ---
 
+### `gtm audiences` — GTM Studio audiences
+
+Audiences are GTM Studio's list-building workbooks (rows of contacts or companies, plus custom
+and AI-populated columns). The write subcommands drive a downstream AI agent, so they require
+`--instruction` — a complete, self-contained description of what to do (the agent sees nothing
+else from your session).
+
+```shell
+# Find an audience (the returned id is the audienceId for every other subcommand)
+gtm audiences list --search "Q3 outbound" --type COMPANY
+
+# Columns + a 10-row preview
+gtm audiences get --id <audienceId> --preview 10
+
+# Create — plain named audience
+gtm audiences create --name "Q3 outbound targets" --type COMPANY \
+  --instruction "Create an audience for Q3 outbound targets: enterprise SaaS companies in North America."
+
+# Create from ZoomInfo search criteria (pass the exact search params as JSON)
+gtm audiences create --name "Boston CFOs" --type CONTACT \
+  --instruction "Build a lead list of CFOs at Boston-area companies." \
+  --search-query '{"jobTitleList":["CFO"],"metroRegion":"MA - Boston"}'
+
+# Rename / annotate
+gtm audiences update --id <audienceId> --name "Q4 outbound targets" \
+  --instruction "Rename the audience to Q4 outbound targets."
+
+# Add columns / load rows from JSON files
+gtm audiences columns --id <audienceId> --file ./columns.json
+gtm audiences rows --id <audienceId> --file ./rows.json \
+  --instruction "Load these trade-show leads into the audience."
+
+# Ask the analysis agent
+gtm audiences analyze --id <audienceId> --query "Summarize this audience and show the top industries"
+```
+
+`columns.json` is an array of `{ name, dataType, agentInstruction }` (add `columnId` to update);
+`rows.json` is an array of `{ values: [{ columnId, value }] }` (add `rowId` to update, max 50 per
+call). Column and row IDs come from `gtm audiences get`.
+
+---
+
 ### `gtm raw` — universal escape hatch
 
 Use this when you need a tool that doesn't have a curated wrapper yet.
