@@ -10,18 +10,20 @@ describe('buildCompaniesSearchArgs', () => {
     expect(buildCompaniesSearchArgs({
       name: 'Acme',
       domain: 'https://acme.com',
-      industry: 'Computer Software',
+      industry: 'software,software.health',
       metro: 'CA - San Francisco',
     })).toEqual({
       companyName: 'Acme',
       companyWebsite: 'https://acme.com',
-      industryCodes: 'Computer Software',
+      industryList: ['software', 'software.health'],
       metroRegion: 'CA - San Francisco',
     });
   });
 
   it('coerces numeric flags to integers', () => {
     expect(buildCompaniesSearchArgs({
+      employeesMin: '100',
+      employeesMax: '500',
       revenueMin: '1000',
       revenueMax: '5000',
       fundingMin: '500',
@@ -29,6 +31,8 @@ describe('buildCompaniesSearchArgs', () => {
       page: '2',
       pageSize: '50',
     })).toEqual({
+      employeeRangeMinimum: 100,
+      employeeRangeMaximum: 500,
       revenueMin: 1000,
       revenueMax: 5000,
       fundingAmountMin: 500,
@@ -38,8 +42,18 @@ describe('buildCompaniesSearchArgs', () => {
     });
   });
 
-  it('passes ticker arrays through unchanged', () => {
-    expect(buildCompaniesSearchArgs({ ticker: ['ZI', 'CRM'] })).toEqual({ companyTicker: ['ZI', 'CRM'] });
+  it('maps zip radius alongside zip', () => {
+    expect(buildCompaniesSearchArgs({ zip: '02110', zipRadius: '50' })).toEqual({
+      zipCode: '02110',
+      zipCodeRadiusMiles: '50',
+    });
+  });
+
+  it('maps ticker and type to their *List variants', () => {
+    expect(buildCompaniesSearchArgs({ ticker: ['ZI', 'CRM'], type: 'private,public' })).toEqual({
+      companyTickerList: ['ZI', 'CRM'],
+      companyTypeList: ['private', 'public'],
+    });
   });
 
   it('drops empty strings (falsy in TS so they are skipped)', () => {

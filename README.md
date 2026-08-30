@@ -1,8 +1,8 @@
 # GTM AI CLI
 
 A command-line interface for searching [ZoomInfo](https://www.zoominfo.com/) go-to-market (GTM) data. 
-Search and enrich companies and contacts, surface intent signals and news, manage GTM context, and pipe results 
-through your shell as JSON, JSONL, CSV, YAML, or a table.
+Search and enrich companies and contacts, surface intent / news / scoop signals, browse engagement history, 
+manage GTM context, and pipe results through your shell as JSON, JSONL, CSV, YAML, or a table.
 
 ## Installation
 
@@ -215,7 +215,16 @@ gtm contacts search --management-level Manager --department "Engineering & Techn
 
 # Sales leaders with accuracy score ≥ 90
 gtm contacts search --management-level "VP Level Exec" --department Sales --accuracy-min 90
+
+# People who WORK in metro Boston (not just companies headquartered there) — --location-type
+# scopes the location filters to the person, the company HQ, or both
+gtm contacts search --job-title "CFO" --metro "MA - Boston" --location-type Person
+
+# Within 25 miles of a zip code
+gtm contacts search --management-level "C Level Exec" --zip 02110 --zip-radius 25
 ```
+
+`--location-type` accepts `Person`, `HQ`, `PersonOrHQ`, `PersonAndHQ`, or `PersonThenHQ` and requires at least one location filter (`--metro`, `--state`, `--country`, `--zip`). It's also available on `gtm intent search` and `gtm scoops search`.
 
 **Enrich.** Provide any valid identifier combination — `personId` (most accurate), `email`, `phone`, or `firstName + lastName + (company OR companyId)`:
 
@@ -270,13 +279,7 @@ gtm intent search --topics "Mobile Apps" --signal-score-min 80 \
 gtm intent search --topics "AI Agents" --audience-strength-min B --audience-strength-max A
 ```
 
-**Enrich** — pull intent signals for a specific company:
-
-```shell
-gtm intent enrich --company-id 344589814 --topics "Cloud Applications" "Java"
-gtm intent enrich --name "ZoomInfo" --topics "AI Agents" --signal-score-min 70
-gtm intent enrich --website https://www.stripe.com --topics "Payments"
-```
+For intent signals on a *specific* company, use [`gtm signals`](#gtm-signals--per-company-intent--news--scoops) with `--types INTENT`.
 
 ---
 
@@ -299,31 +302,31 @@ gtm scoops search --scoop-types Layoffs --employees "10000plus" --published-star
 gtm scoops search --scoop-types "Product Launch" --description "artificial intelligence" --published-start 2026-04-01
 ```
 
-**Enrich** — get scoops for a specific company:
-
-```shell
-gtm scoops enrich --company-id 344589814 --scoop-types "New Hire" Promotion
-gtm scoops enrich --name "Stripe" --published-start 2026-01-01
-```
+For scoops on a *specific* company, use [`gtm signals`](#gtm-signals--per-company-intent--news--scoops) with `--types SCOOP`.
 
 ---
 
-### `gtm news` — news articles
+### `gtm signals` — per-company intent + news + scoops
 
-`enrich_news` is currently the only news tool. Requires `--company-id`.
+One call returns the latest signals across all three categories for up to 10 companies — ideal for
+a quick "what's happening at these accounts" sweep. Replaces the former `gtm intent enrich`,
+`gtm scoops enrich`, and `gtm news enrich` commands (the MCP consolidated those tools into
+`enrich_company_signals`).
 
 ```shell
-# Recent funding/financial news for ZoomInfo
-gtm news enrich --company-id 344589814 --categories FINANCIAL_RESULTS FUNDING
+# Everything recent for one company (intent + news + scoops, sorted by latest date)
+gtm signals --company-ids 344589814
 
-# Product news in the last quarter
-gtm news enrich --company-id 344589814 --categories PRODUCT --publishing-start 2026-03-01 --publishing-end 2026-05-31
+# Just the news
+gtm signals --company-ids 344589814 --types NEWS
 
-# Leadership news (appointments, departures)
-gtm news enrich --company-id 344589814 --categories PERSON
+# Intent + scoops across a batch of target accounts
+gtm signals --company-ids 344589814 239305146 5237537 --types INTENT SCOOP
 ```
 
-Valid `--categories`: `FINANCIAL_RESULTS`, `FUNDING`, `GENERAL_NEWS`, `GENERAL_PRESS_RELEASE`, `MERGER_OR_ACQUISITION`, `PERSON`, `PRODUCT`.
+The response is `{ results: [{ company, signals: [...] }] }` — each signal has `signalType`,
+`date`, `summary`, and type-specific `details`. Charges data credits for companies not under
+management (companies enriched within the prior 12 months don't incur additional charges).
 
 ---
 
@@ -372,6 +375,41 @@ gtm research account --company-id 344589814 \
 # Person/contact research
 gtm research contact --contact-id 1260398587 \
   --query "Who is this person, their role, and our history with them before I reach out"
+```
+
+---
+
+### `gtm engagements` — meetings, emails, and conversation intelligence
+
+Requires your ZoomInfo org to have a calendar / email / meeting provider integration configured.
+`list` is free (no data credits).
+
+```shell
+# Recent engagements (default window: last 7 days → 7 days ahead)
+gtm engagements list --limit 10
+
+# Meetings with a specific account, newest first
+gtm engagements list --company-id 344589814 --type MEETINGS --sort -chronological
+
+# A specific date window (ISO 8601, max 90 days)
+gtm engagements list --start 2026-06-01T00:00:00Z --end 2026-08-01T00:00:00Z
+```
+
+**Ask** — natural-language questions over calls, meetings, and emails. Scope to exactly one of an
+engagement, an account, or a contact:
+
+```shell
+# Account scope: synthesize across recent engagements
+gtm engagements ask --company-id 344589814 --query "What concerns has this account raised recently? What did we promise them?"
+
+# Contact scope
+gtm engagements ask --contact-id 1260398587 --query "What has this person told us they care about?"
+
+# Engagement scope: drill into one call/meeting/email (IDs come from `gtm engagements list` — quote them, some contain angle brackets)
+gtm engagements ask --engagement-id "<abc123@mail.example.com>" --query "What were the main objections?"
+
+# Include the raw transcript / email body (engagement scope only — can be very large)
+gtm engagements ask --engagement-id "abc123" --query "Summarize this call" --include-content
 ```
 
 ---

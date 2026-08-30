@@ -39,7 +39,7 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
   });
 
   it('companies search', () => {
-    const { status, data } = runJson(['companies', 'search', '--industry', 'Software', '--page-size', '3']);
+    const { status, data } = runJson(['companies', 'search', '--industry', 'software', '--page-size', '3']);
     expect(status).toBe(0);
     expect(data).not.toBeNull();
   });
@@ -88,28 +88,30 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     expect(status).toBe(0);
   });
 
-  it('intent enrich (by derived topic + company id)', (ctx) => {
-    if (!intentTopic || !companyId) return ctx.skip();
-    const { status } = runJson(['intent', 'enrich', '--topics', intentTopic, '--company-id', companyId]);
-    expect(status).toBe(0);
-  });
-
   it('scoops search', () => {
     const { status } = runJson(['scoops', 'search', '--scoop-types', 'Funding', '--page-size', '3']);
     expect(status).toBe(0);
   });
 
-  it('scoops enrich (by derived company id)', (ctx) => {
+  it('signals (by derived company id)', (ctx) => {
     if (!companyId) return ctx.skip();
-    const { status } = runJson(['scoops', 'enrich', '--company-id', companyId]);
+    const { status } = runJson(['signals', '--company-ids', companyId, '--types', 'NEWS']);
     expect(status).toBe(0);
   });
 
-  it('news enrich (by derived company id)', (ctx) => {
-    if (!companyId) return ctx.skip();
-    const { status } = runJson(['news', 'enrich', '--company-id', companyId]);
+  it('engagements list', () => {
+    const { status } = runJson(['engagements', 'list', '--limit', '3']);
     expect(status).toBe(0);
   });
+
+  it('engagements ask (by derived company id)', (ctx) => {
+    if (!companyId) return ctx.skip();
+    const { status } = runJson(
+      ['engagements', 'ask', '--company-id', companyId, '--query', 'Briefly, what recent engagement activity do we have with this account?'],
+      120_000,
+    );
+    expect(status).toBe(0);
+  }, 130_000);
 
   it('gtm-context get', () => {
     const { status } = runJson(['gtm-context', 'get']);
@@ -146,7 +148,7 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
   });
 
   it('--select projects fields from a search result', () => {
-    const { status, data } = runJson(['companies', 'search', '--industry', 'Software', '--page-size', '2', '--select', 'id,name']);
+    const { status, data } = runJson(['companies', 'search', '--industry', 'software', '--page-size', '2', '--select', 'id,name']);
     expect(status).toBe(0);
     expect(data).not.toBeNull();
   });
