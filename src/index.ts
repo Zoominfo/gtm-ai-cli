@@ -11,6 +11,7 @@ if (debugIdx >= 0) {
 
 import { Command } from 'commander';
 import { pkg } from './pkg.js';
+import { registerAudiences } from './commands/audiences.js';
 import { registerAuth } from './commands/auth.js';
 import { registerCompanies } from './commands/companies.js';
 import { registerContacts } from './commands/contacts.js';
@@ -33,6 +34,7 @@ program
   .description('Command-line interface for the ZoomInfo GTM AI MCP server\n\nGlobal flags:\n  -d, --debug   Log MCP tool calls and responses to stderr (also: GTM_DEBUG=1)')
   .version(pkg.version);
 
+registerAudiences(program);
 registerAuth(program);
 registerCompanies(program);
 registerContacts(program);

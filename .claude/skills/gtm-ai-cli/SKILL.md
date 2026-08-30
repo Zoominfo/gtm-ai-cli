@@ -235,13 +235,30 @@ gtm feedback submit --category FEATURE_REQUEST --message "Want a --csv-headers f
 
 Categories: `DATA_QUALITY`, `FEATURE_REQUEST`, `ACCESS_ENTITLEMENT_ISSUE`, `OTHER`.
 
+### Audiences — GTM Studio list-building workbooks
+
+Audiences hold rows of contacts or companies plus custom / AI-populated columns. Write subcommands (`create`, `update`, `columns`, `rows`) drive a downstream AI agent and require `--instruction` — a complete, self-contained description of the task (the agent sees nothing else from the session). Never guess IDs: audience IDs come from `audiences list`, column/row IDs from `audiences get`.
+
+```bash
+gtm audiences list --search "Q3 outbound" --type COMPANY          # id in results = audienceId
+gtm audiences get --id <audienceId> --preview 10                  # columns + row preview (max 25 rows)
+gtm audiences create --name "Boston CFOs" --type CONTACT \
+  --instruction "Build a lead list of CFOs at Boston-area companies." \
+  --search-query '{"jobTitleList":["CFO"],"metroRegion":"MA - Boston"}'
+gtm audiences update --id <audienceId> --name "Q4 targets" --instruction "Rename the audience to Q4 targets."
+gtm audiences columns --id <audienceId> --file ./columns.json     # [{ name, dataType, agentInstruction }] (+columnId to update)
+gtm audiences rows --id <audienceId> --file ./rows.json --instruction "Load these trade-show leads."   # [{ values: [{ columnId, value }] }] (+rowId to update, max 50/call)
+gtm audiences analyze --id <audienceId> --query "Summarize this audience and show the top industries"
+```
+
+When creating an audience from ZoomInfo search criteria, pass the exact search input params as JSON via `--search-query` (company filters for `--type COMPANY`, contact filters for `--type CONTACT`).
+
 ### Raw — universal escape hatch
 
-Use when you need a tool that doesn't have a curated wrapper (currently the GTM Studio audience tools: `browse_audiences`, `get_audience`, `upsert_audience`, `manage_audience_columns`, `manage_audience_rows`, `query_audience_analysis_agent`).
+Use when you need a tool that doesn't have a curated wrapper.
 
 ```bash
 gtm raw list-tools -f table                                                          # show every MCP tool the server exposes
-gtm raw call browse_audiences --args '{"pageSize":10}'
 gtm raw call find_similar_companies --args '{"companyName":"Stripe"}'
 ```
 
