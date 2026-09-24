@@ -67,7 +67,6 @@ interface AudiencesRowsOptions {
 interface AudiencesAnalyzeOptions {
   id: string;
   query: string;
-  viewId?: string;
   format?: string;
   select?: string;
 }
@@ -95,6 +94,25 @@ export function buildAudiencesGetArgs(opts: AudiencesGetOptions): Record<string,
   return args;
 }
 
+// Pagination and sort keys are ignored when an audience is created from search criteria, and
+// CLI searches always send page/pageSize, so strip them from pasted search params.
+const SEARCH_QUERY_IGNORED_KEYS = ['page', 'pageSize', 'sort'];
+
+function normalizeSearchQuery(raw: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('--search-query must be valid JSON');
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('--search-query must be a JSON object of search_companies / search_contacts params');
+  }
+  const params = { ...(parsed as Record<string, unknown>) };
+  for (const key of SEARCH_QUERY_IGNORED_KEYS) delete params[key];
+  return JSON.stringify(params);
+}
+
 export function buildAudiencesUpsertArgs(opts: Partial<AudiencesCreateOptions> & Partial<AudiencesUpdateOptions>): Record<string, unknown> {
   const args: Record<string, unknown> = { agentInstruction: opts.instruction };
   if (opts.id) args.audienceId = opts.id;
@@ -103,16 +121,21 @@ export function buildAudiencesUpsertArgs(opts: Partial<AudiencesCreateOptions> &
   if (opts.description) args.description = opts.description;
   if (opts.notes) args.notes = opts.notes;
   if (opts.folderId) args.folderId = opts.folderId;
-  if (opts.searchQuery) args.searchQuery = opts.searchQuery;
+  if (opts.searchQuery) args.searchQuery = normalizeSearchQuery(opts.searchQuery);
   return args;
 }
 
+const MAX_ROWS_PER_CALL = 50;
+
+export function buildAudiencesRowsArgs(id: string, rows: unknown[], instruction: string): Record<string, unknown> {
+  if (rows.length < 1 || rows.length > MAX_ROWS_PER_CALL) {
+    throw new Error(`--file must contain 1-${MAX_ROWS_PER_CALL} rows per call (got ${rows.length}); split larger loads across calls`);
+  }
+  return { audienceId: id, rows, agentInstruction: instruction };
+}
+
 export function buildAudiencesAnalyzeArgs(opts: AudiencesAnalyzeOptions): Record<string, unknown> {
-  // The audience id doubles as the workbook sheet id — the audience tools don't
-  // expose a separate sheet-id field.
-  const agentProps: Record<string, unknown> = { entityId: opts.id, workbookSheetId: opts.id };
-  if (opts.viewId) agentProps.view_id = opts.viewId;
-  return { query: opts.query, agentProps };
+  return { audienceId: opts.id, query: opts.query };
 }
 
 // Reads a JSON file containing an array, optionally wrapped in { "<key>": [...] }.
@@ -170,7 +193,7 @@ export function registerAudiences(program: Command): void {
     .option('--description <text>', 'Audience summary shown in the GTM Studio UI (max 500 chars)')
     .option('--notes <text>', 'Reference notes (max 1000 chars)')
     .option('--folder-id <uuid>', 'Folder to create the audience in')
-    .option('--search-query <json>', 'Exact searchCompaniesV2 / searchContactsV2 input params as JSON, when prospecting from ZoomInfo search criteria')
+    .option('--search-query <json>', 'Exact search_companies (COMPANY) / search_contacts (CONTACT) input params as JSON, when prospecting from ZoomInfo search criteria (page, pageSize, and sort are dropped)')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: AudiencesCreateOptions) => {
@@ -217,11 +240,7 @@ export function registerAudiences(program: Command): void {
     .option(...SELECT_OPTION)
     .action(async (opts: AudiencesRowsOptions) => {
       const rows = await readJsonArray(opts.file, 'rows');
-      const data = await mcpCall('manage_audience_rows', {
-        audienceId: opts.id,
-        rows,
-        agentInstruction: opts.instruction,
-      });
+      const data = await mcpCall('manage_audience_rows', buildAudiencesRowsArgs(opts.id, rows, opts.instruction));
       print(data, opts.format, opts.select);
     });
 
@@ -230,11 +249,10 @@ export function registerAudiences(program: Command): void {
     .description('Ask the audience analysis agent for counts, summaries, distributions, segments, rankings, or comparisons')
     .requiredOption('--id <uuid>', 'Audience ID from `gtm audiences list`')
     .requiredOption('--query <text>', 'Complete analysis request — include exact column names when known')
-    .option('--view-id <id>', 'Analyze a specific saved audience view')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: AudiencesAnalyzeOptions) => {
-      const data = await mcpCall('query_audience_analysis_agent', buildAudiencesAnalyzeArgs(opts));
+      const data = await mcpCall('audience_analysis', buildAudiencesAnalyzeArgs(opts));
       print(data, opts.format, opts.select);
     });
 }

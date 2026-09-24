@@ -3,6 +3,7 @@ import {
   buildAudiencesListArgs,
   buildAudiencesGetArgs,
   buildAudiencesUpsertArgs,
+  buildAudiencesRowsArgs,
   buildAudiencesAnalyzeArgs,
 } from './audiences.js';
 
@@ -71,6 +72,25 @@ describe('buildAudiencesUpsertArgs', () => {
     });
   });
 
+  it('strips pagination and sort keys from --search-query', () => {
+    const args = buildAudiencesUpsertArgs({
+      name: 'SF VPs',
+      type: 'contact',
+      instruction: 'Create an audience of VPs in San Francisco.',
+      searchQuery: '{"managementLevelList":["VP Level Exec"],"metroRegion":"CA - San Francisco","page":1,"pageSize":25,"sort":"-relevance"}',
+    });
+    expect(JSON.parse(args.searchQuery as string)).toEqual({
+      managementLevelList: ['VP Level Exec'],
+      metroRegion: 'CA - San Francisco',
+    });
+  });
+
+  it('rejects --search-query that is not a JSON object', () => {
+    const base = { name: 'x', type: 'COMPANY', instruction: 'Create an audience.' };
+    expect(() => buildAudiencesUpsertArgs({ ...base, searchQuery: 'metroRegion=Boston' })).toThrow(/valid JSON/);
+    expect(() => buildAudiencesUpsertArgs({ ...base, searchQuery: '["Boston"]' })).toThrow(/JSON object/);
+  });
+
   it('builds an update payload keyed by audienceId, preserving omitted fields', () => {
     expect(buildAudiencesUpsertArgs({
       id: 'aud-1',
@@ -84,18 +104,32 @@ describe('buildAudiencesUpsertArgs', () => {
   });
 });
 
-describe('buildAudiencesAnalyzeArgs', () => {
-  it('uses the audience id for both entityId and workbookSheetId', () => {
-    expect(buildAudiencesAnalyzeArgs({ id: 'aud-1', query: 'Top industries?' })).toEqual({
-      query: 'Top industries?',
-      agentProps: { entityId: 'aud-1', workbookSheetId: 'aud-1' },
+describe('buildAudiencesRowsArgs', () => {
+  const row = { values: [{ columnId: 'col-a', value: 'Acme' }] };
+
+  it('builds the manage_audience_rows payload', () => {
+    expect(buildAudiencesRowsArgs('aud-1', [row], 'Load these leads.')).toEqual({
+      audienceId: 'aud-1',
+      rows: [row],
+      agentInstruction: 'Load these leads.',
     });
   });
 
-  it('forwards a view id when provided', () => {
-    expect(buildAudiencesAnalyzeArgs({ id: 'aud-1', query: 'Summarize', viewId: 'view-9' })).toEqual({
-      query: 'Summarize',
-      agentProps: { entityId: 'aud-1', workbookSheetId: 'aud-1', view_id: 'view-9' },
+  it('accepts up to 50 rows', () => {
+    expect(() => buildAudiencesRowsArgs('aud-1', Array(50).fill(row), 'Load.')).not.toThrow();
+  });
+
+  it('rejects empty files and more than 50 rows', () => {
+    expect(() => buildAudiencesRowsArgs('aud-1', [], 'Load.')).toThrow(/1-50 rows/);
+    expect(() => buildAudiencesRowsArgs('aud-1', Array(51).fill(row), 'Load.')).toThrow(/1-50 rows/);
+  });
+});
+
+describe('buildAudiencesAnalyzeArgs', () => {
+  it('passes the audience id and query at the top level', () => {
+    expect(buildAudiencesAnalyzeArgs({ id: 'aud-1', query: 'Top industries?' })).toEqual({
+      audienceId: 'aud-1',
+      query: 'Top industries?',
     });
   });
 });

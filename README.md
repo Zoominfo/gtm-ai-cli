@@ -454,6 +454,10 @@ gtm audiences rows --id <audienceId> --file ./rows.json \
 gtm audiences analyze --id <audienceId> --query "Summarize this audience and show the top industries"
 ```
 
+`--search-query` takes the exact params of the matching search (`search_companies` for `COMPANY`,
+`search_contacts` for `CONTACT`) as a JSON object — run the search with `--debug` to see them.
+`page`, `pageSize`, and `sort` are dropped, since they don't apply to audience creation.
+
 `columns.json` is an array of `{ name, dataType, agentInstruction }` (add `columnId` to update);
 `rows.json` is an array of `{ values: [{ columnId, value }] }` (add `rowId` to update, max 50 per
 call). Column and row IDs come from `gtm audiences get`.

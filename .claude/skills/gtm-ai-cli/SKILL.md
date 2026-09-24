@@ -255,6 +255,8 @@ gtm audiences rows --id <audienceId> --file ./rows.json --instruction "Load thes
 gtm audiences analyze --id <audienceId> --query "Summarize this audience and show the top industries"
 ```
 
+`--search-query` takes the exact params of the matching search (`search_companies` for `COMPANY`, `search_contacts` for `CONTACT`) as a JSON object — the `gtm companies/contacts search --debug` output shows them. Include it only when the audience is sourced from a ZoomInfo search; `page`, `pageSize`, and `sort` are dropped. `analyze` answers counts, distributions, rankings, segments, and comparisons in one call — put every metric you need in a single `--query`, quoting exact column names.
+
 When creating an audience from ZoomInfo search criteria, pass the exact search input params as JSON via `--search-query` (company filters for `--type COMPANY`, contact filters for `--type CONTACT`).
 
 ### Raw — universal escape hatch
