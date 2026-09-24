@@ -14,7 +14,8 @@ Layout mirrors `apolloio/apollo-io-cli`:
 - `src/live/` — live integration suite (real MCP session, gated on env)
 
 Command groups: `auth`, `companies`, `contacts`, `intent`, `scoops`, `signals` (per-company
-intent + news + scoops), `engagements` (meetings/emails + conversation intelligence), `lookup`,
+intent + news + scoops), `engagements` (meetings/emails + conversation intelligence),
+`audiences` (GTM Studio list-building workbooks), `lookup`,
 `research` (account/contact — agentic, natural-language), `gtm-context`, `feedback`, and
 `raw`. Most data commands also accept `--select <dotted,paths>` for client-side output
 projection (distinct from enrich's `--fields`, which selects server-side `requiredFields`).

@@ -119,6 +119,17 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     expect(status).toBe(0);
   }, 130_000);
 
+  it('audiences list, then get and analyze (by derived id)', (ctx) => {
+    const { status, data } = runJson(['audiences', 'list', '--page-size', '1']);
+    expect(status).toBe(0);
+    const audienceId = pickField(records(data)[0], ['id', 'audienceId']);
+    if (!audienceId) return ctx.skip();
+    const got = runJson(['audiences', 'get', '--id', audienceId]);
+    expect(got.status).toBe(0);
+    const analyzed = runJson(['audiences', 'analyze', '--id', audienceId, '--query', 'How many rows does this audience have?'], 120_000);
+    expect(analyzed.status).toBe(0);
+  }, 130_000);
+
   it('gtm-context get', () => {
     const { status } = runJson(['gtm-context', 'get']);
     expect(status).toBe(0);
