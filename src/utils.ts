@@ -39,6 +39,13 @@ export function parseRange(input: string): { min: string; max: string } {
   return { min: min ?? '', max: max ?? '' };
 }
 
+// The MCP search tools deprecated their comma-separated string params in favor of typed
+// `*List` array variants. CLI flags keep accepting comma-separated values; this converts
+// them to the array shape the active params expect.
+export function splitList(input: string): string[] {
+  return input.split(',').map((v) => v.trim()).filter(Boolean);
+}
+
 const NON_FILTER_KEYS = new Set(['page', 'pageSize', 'sort']);
 
 // Exits with a helpful error if the built MCP args contain only paging/sort keys.

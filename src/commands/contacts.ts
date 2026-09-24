@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters } from '../utils.js';
+import { requireSearchFilters, splitList } from '../utils.js';
 
 interface ContactsSearchOptions {
   firstName?: string;
@@ -21,13 +21,19 @@ interface ContactsSearchOptions {
   metro?: string;
   state?: string;
   country?: string;
+  zip?: string;
+  zipRadius?: string;
+  locationType?: string;
   employees?: string;
+  employeesMin?: string;
+  employeesMax?: string;
   revenue?: string;
+  revenueMin?: string;
+  revenueMax?: string;
   tech?: string;
   accuracyMin?: string;
   accuracyMax?: string;
   required?: string;
-  executivesOnly?: boolean;
   sort?: string;
   page?: string;
   pageSize?: string;
@@ -38,7 +44,6 @@ interface ContactsSearchOptions {
 interface ContactsEnrichOptions {
   id?: string;
   email?: string;
-  hashedEmail?: string;
   phone?: string;
   firstName?: string;
   lastName?: string;
@@ -75,25 +80,33 @@ export function buildContactsSearchArgs(opts: ContactsSearchOptions): Record<str
   if (opts.lastName) args.lastName = opts.lastName;
   if (opts.fullName) args.fullName = opts.fullName;
   if (opts.email) args.emailAddress = opts.email;
-  if (opts.jobTitle) args.jobTitle = opts.jobTitle;
+  // Free-text job titles keep the documented "A OR B" input shape; the active
+  // jobTitleList param wants each title as a separate array item.
+  if (opts.jobTitle) args.jobTitleList = opts.jobTitle.split(/\s+OR\s+/i).map((t) => t.trim()).filter(Boolean);
   if (opts.exactJobTitle) args.exactJobTitle = opts.exactJobTitle;
-  if (opts.managementLevel) args.managementLevel = opts.managementLevel;
-  if (opts.department) args.department = opts.department;
-  if (opts.jobFunction) args.jobFunction = opts.jobFunction;
-  if (opts.companyId) args.companyId = opts.companyId;
+  if (opts.managementLevel) args.managementLevelList = splitList(opts.managementLevel);
+  if (opts.department) args.departmentList = splitList(opts.department);
+  if (opts.jobFunction) args.jobFunctionList = splitList(opts.jobFunction);
+  if (opts.companyId) args.companyIdList = splitList(opts.companyId).map((id) => parseInt(id, 10));
   if (opts.companyName) args.companyName = opts.companyName;
   if (opts.companyDomain) args.companyWebsite = opts.companyDomain;
-  if (opts.industry) args.industryCodes = opts.industry;
+  if (opts.industry) args.industryList = splitList(opts.industry);
   if (opts.metro) args.metroRegion = opts.metro;
   if (opts.state) args.state = opts.state;
   if (opts.country) args.country = opts.country;
+  if (opts.zip) args.zipCode = opts.zip;
+  if (opts.zipRadius) args.zipCodeRadiusMiles = opts.zipRadius;
+  if (opts.locationType) args.locationSearchType = opts.locationType;
   if (opts.employees) args.employeeCount = opts.employees;
+  if (opts.employeesMin) args.employeeRangeMinimum = parseInt(opts.employeesMin, 10);
+  if (opts.employeesMax) args.employeeRangeMaximum = parseInt(opts.employeesMax, 10);
   if (opts.revenue) args.revenue = opts.revenue;
-  if (opts.tech) args.techAttributeTagList = opts.tech;
-  if (opts.accuracyMin) args.contactAccuracyScoreMin = opts.accuracyMin;
-  if (opts.accuracyMax) args.contactAccuracyScoreMax = opts.accuracyMax;
-  if (opts.required) args.requiredFields = opts.required;
-  if (opts.executivesOnly) args.executivesOnly = true;
+  if (opts.revenueMin) args.revenueMin = parseInt(opts.revenueMin, 10);
+  if (opts.revenueMax) args.revenueMax = parseInt(opts.revenueMax, 10);
+  if (opts.tech) args.techAttributeTagIdList = splitList(opts.tech);
+  if (opts.accuracyMin) args.contactAccuracyScoreMinimum = parseInt(opts.accuracyMin, 10);
+  if (opts.accuracyMax) args.contactAccuracyScoreMaximum = parseInt(opts.accuracyMax, 10);
+  if (opts.required) args.requiredFieldsList = splitList(opts.required);
   if (opts.sort) args.sort = opts.sort;
   if (opts.page) args.page = parseInt(opts.page, 10);
   if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
@@ -105,7 +118,6 @@ export function buildContactsEnrichEntry(opts: ContactsEnrichOptions): Record<st
   const entry: Record<string, unknown> = {};
   if (opts.id) entry.personId = opts.id;
   if (opts.email) entry.email = opts.email;
-  if (opts.hashedEmail) entry.hashedEmail = opts.hashedEmail;
   if (opts.phone) entry.phone = opts.phone;
   if (opts.firstName) entry.firstName = opts.firstName;
   if (opts.lastName) entry.lastName = opts.lastName;
@@ -127,24 +139,30 @@ export function registerContacts(program: Command): void {
     .option('--full-name <name>')
     .option('--email <email>')
     .option('--job-title <titles>', 'Job titles (use OR for multiple: "CFO OR VP Finance")')
-    .option('--exact-job-title <titles>', 'Exact job title match')
+    .option('--exact-job-title <titles>', 'Exact job title match (legacy — use OR for multiple)')
     .option('--management-level <levels>', 'C Level Exec | VP Level Exec | Director | Manager | Non Manager | Board Member (comma-separated)')
     .option('--department <depts>', 'Department(s) — use `gtm lookup --field departments` for valid values')
-    .option('--job-function <funcs>', 'Job function(s)')
+    .option('--job-function <funcs>', 'Job function(s) — use `gtm lookup --field job-functions` for valid values')
     .option('--company-id <id>', 'ZoomInfo company ID(s) — comma-separated')
     .option('--company-name <name>')
     .option('--company-domain <url>', 'Company website URL')
-    .option('--industry <codes>', 'Industry codes (comma-separated) — use lookup industries')
+    .option('--industry <ids>', 'Industry IDs (comma-separated) — pass the `id` values from `gtm lookup --field industries` (e.g. software.health)')
     .option('--metro <regions>', 'Metro regions (comma-separated)')
     .option('--state <states>')
     .option('--country <countries>')
+    .option('--zip <code>', 'Zip / postal code (intersected with the other location filters)')
+    .option('--zip-radius <miles>', 'Radius in miles around --zip: 10 | 25 | 50 | 100 | 250')
+    .option('--location-type <type>', 'What the location filters apply to: Person | HQ | PersonOrHQ | PersonAndHQ | PersonThenHQ. Requires at least one location filter')
     .option('--employees <ranges>', 'Employee count ranges, e.g. "100to249,250to499"')
+    .option('--employees-min <n>', 'Minimum employee count (granular)')
+    .option('--employees-max <n>', 'Maximum employee count (granular)')
     .option('--revenue <ranges>', 'Revenue ranges, e.g. "1Mto5M,10Mto25M"')
+    .option('--revenue-min <thousands>', 'Min annual revenue in thousands')
+    .option('--revenue-max <thousands>', 'Max annual revenue in thousands')
     .option('--tech <productIds>', 'Tech product IDs (comma-separated)')
     .option('--accuracy-min <score>', 'Minimum contact accuracy score (70-99)')
     .option('--accuracy-max <score>', 'Maximum contact accuracy score (70-99)')
     .option('--required <fields>', 'Required fields: email | phone | directPhone | mobilePhone | personalEmail (comma-separated)')
-    .option('--executives-only', 'Only return executives')
     .option('--sort <field>', 'Sort field (prefix - for descending). e.g. -contactAccuracyScore')
     .option('--page <n>', 'Page number', '1')
     .option('--page-size <n>', 'Results per page (max 100)', '25')
@@ -159,7 +177,7 @@ export function registerContacts(program: Command): void {
         '--management-level <levels>  C Level Exec | VP Level Exec | Director | Manager | Non Manager',
         '--company-id <id>            ZoomInfo company ID (use `gtm companies search` to find one)',
         '--company-name <name>        Company name',
-        '--industry <codes>           Industry codes (use `gtm lookup --field industries`)',
+        '--industry <ids>             Industry IDs (use `gtm lookup --field industries`)',
         '--metro <regions>            Metro regions (use `gtm lookup --field metro-regions`)',
       ]);
       const data = await mcpCall('search_contacts', args);
@@ -171,7 +189,6 @@ export function registerContacts(program: Command): void {
     .description('Enrich a contact (or up to 10 via --file)')
     .option('--id <personId>', 'ZoomInfo person ID (most accurate)')
     .option('--email <email>', 'Email address (business or personal)')
-    .option('--hashed-email <hash>', 'Hashed email (MD5/SHA1/SHA256/SHA512)')
     .option('--phone <phone>', 'Direct or mobile phone number')
     .option('--first-name <name>', 'First name (combine with --last-name and --company / --company-id)')
     .option('--last-name <name>')
