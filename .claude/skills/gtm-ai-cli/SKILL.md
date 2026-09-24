@@ -51,7 +51,7 @@ gtm lookup --field tech-products --vendor "HubSpot, Inc"
 gtm lookup --field metro-regions --fuzzy "san francisco"
 ```
 
-Valid `--field` values: `industries`, `metro-regions`, `states`, `countries`, `continents`, `management-levels`, `departments`, `job-functions`, `employee-count`, `revenue-ranges`, `company-types`, `company-rankings`, `intent-topics`, `scoop-topics`, `scoop-types`, `scoop-departments`, `news-categories`, `naics-codes`, `sic-codes`, `tech-vendors`, `tech-products`, `tech-categories`, `tech-skills`, `hashtags`, `buying-groups`, `board-members`, `years-of-experience`, `sub-unit-types`, `job-titles`.
+Valid `--field` values: `industries`, `metro-regions`, `states`, `countries`, `continents`, `management-levels`, `departments`, `job-functions`, `employee-count`, `revenue-ranges`, `funding-round-types`, `company-types`, `company-rankings`, `intent-topics`, `scoop-topics`, `scoop-types`, `scoop-departments`, `news-categories`, `naics-codes`, `sic-codes`, `tech-vendors`, `tech-products`, `tech-categories`, `tech-skills`, `hashtags`, `buying-groups`, `board-members`, `years-of-experience`, `sub-unit-types`, `job-titles`.
 
 The response is keyed by field name: `.<fieldName>.data[]` where each entry is `{ attributes: { name }, id, type }`. Pass the `id` value (not `attributes.name`) into search filters.
 
@@ -66,10 +66,11 @@ gtm companies search --name "ZoomInfo"
 gtm companies search --industry software --metro "CA - San Francisco" --employees "100to249,250to499"
 gtm companies search --type public --country "United States" --revenue-min 1000000 --sort -revenue --page-size 10
 gtm companies search --tech "<tech_product_id>" --metro "MA - Boston"
+gtm companies search --industry software --recent-funding-round "Series A,Series B"
 gtm companies search --naics "541511,541512"
 ```
 
-Common filters: `--name`, `--domain`, `--industry` (lookup `id` values, e.g. `software.health`), `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--zip-radius` (10|25|50|100|250 miles), `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--naics`, `--sic`, `--funding-min`/`-max`, `--funding-start`/`-end`, `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
+Common filters: `--name`, `--domain`, `--industry` (lookup `id` values, e.g. `software.health`), `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--zip-radius` (10|25|50|100|250 miles), `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--naics`, `--sic`, `--recent-funding-round` / `--any-funding-round` (lookup `funding-round-types`; pass one, not both), `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
 
 **Enrich.** Provide any identifier (most accurate: `--id`).
 
@@ -90,8 +91,11 @@ The `--fields` flag controls which fields the MCP returns. Valid values (subset)
 
 ```bash
 gtm companies similar --id 344589814
-gtm companies similar --name "Stripe"   # less accurate; CLI resolves a best-match company first
+gtm companies similar --name "Stripe"   # less accurate; the server resolves a best-match company first
+gtm companies similar --id 344589814 --same-industry --same-country --page-size 50
 ```
+
+Narrowing flags: `--same-industry`, `--same-country`, `--same-revenue-range`, `--same-employee-range`. `--page-size` defaults to 25 (max 100).
 
 ### Contacts
 
@@ -301,7 +305,7 @@ gtm companies search --industry "$INDUSTRY_IDS" --metro "CA - San Francisco"
 
 > **Doing many calls? Pick the cheapest option in this order:**
 >
-> 1. **Native bulk (`--file`) — preferred.** `enrich` accepts up to 10 identifiers in a single MCP call, so there's no loop and no rate concern. Use it whenever you're enriching a set. (Only `enrich` has bulk mode — `search`/`similar`/`scoops`/`intent`/`news` are single-call per invocation.)
+> 1. **Native bulk (`--file`) — preferred.** `enrich` accepts up to 10 identifiers in a single MCP call, so there's no loop and no rate concern. Use it whenever you're enriching a set. (Only `enrich` has `--file` bulk mode, and `signals` accepts up to 10 `--company-ids` per call — `search`/`similar`/`scoops`/`intent` are single-call per invocation.)
 >     ```bash
 >     gtm companies enrich --file ./companies.json   # up to 10 in one round trip
 >     gtm contacts enrich  --file ./contacts.json

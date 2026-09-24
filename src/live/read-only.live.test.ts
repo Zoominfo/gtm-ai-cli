@@ -38,6 +38,12 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     expect(data).not.toBeNull();
   });
 
+  it('lookup funding-round-types returns reference values', () => {
+    const { status, data } = runJson(['lookup', '--field', 'funding-round-types']);
+    expect(status).toBe(0);
+    expect(data).not.toBeNull();
+  });
+
   it('companies search', () => {
     const { status, data } = runJson(['companies', 'search', '--industry', 'software', '--page-size', '3']);
     expect(status).toBe(0);
@@ -53,7 +59,7 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
 
   it('companies similar (by derived id)', (ctx) => {
     if (!companyId) return ctx.skip();
-    const { status } = runJson(['companies', 'similar', '--id', companyId]);
+    const { status } = runJson(['companies', 'similar', '--id', companyId, '--same-industry', '--page-size', '3']);
     expect(status).toBe(0);
   });
 

@@ -44,7 +44,6 @@ interface ContactsSearchOptions {
 interface ContactsEnrichOptions {
   id?: string;
   email?: string;
-  hashedEmail?: string;
   phone?: string;
   firstName?: string;
   lastName?: string;
@@ -119,7 +118,6 @@ export function buildContactsEnrichEntry(opts: ContactsEnrichOptions): Record<st
   const entry: Record<string, unknown> = {};
   if (opts.id) entry.personId = opts.id;
   if (opts.email) entry.email = opts.email;
-  if (opts.hashedEmail) entry.hashedEmail = opts.hashedEmail;
   if (opts.phone) entry.phone = opts.phone;
   if (opts.firstName) entry.firstName = opts.firstName;
   if (opts.lastName) entry.lastName = opts.lastName;
@@ -179,7 +177,7 @@ export function registerContacts(program: Command): void {
         '--management-level <levels>  C Level Exec | VP Level Exec | Director | Manager | Non Manager',
         '--company-id <id>            ZoomInfo company ID (use `gtm companies search` to find one)',
         '--company-name <name>        Company name',
-        '--industry <codes>           Industry codes (use `gtm lookup --field industries`)',
+        '--industry <ids>             Industry IDs (use `gtm lookup --field industries`)',
         '--metro <regions>            Metro regions (use `gtm lookup --field metro-regions`)',
       ]);
       const data = await mcpCall('search_contacts', args);
@@ -191,7 +189,6 @@ export function registerContacts(program: Command): void {
     .description('Enrich a contact (or up to 10 via --file)')
     .option('--id <personId>', 'ZoomInfo person ID (most accurate)')
     .option('--email <email>', 'Email address (business or personal)')
-    .option('--hashed-email <hash>', 'Hashed email (MD5/SHA1/SHA256/SHA512)')
     .option('--phone <phone>', 'Direct or mobile phone number')
     .option('--first-name <name>', 'First name (combine with --last-name and --company / --company-id)')
     .option('--last-name <name>')

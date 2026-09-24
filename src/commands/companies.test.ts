@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCompaniesSearchArgs, buildCompaniesEnrichEntry } from './companies.js';
+import { buildCompaniesSearchArgs, buildCompaniesEnrichEntry, buildCompaniesSimilarArgs } from './companies.js';
 
 describe('buildCompaniesSearchArgs', () => {
   it('omits all keys when no flags are passed', () => {
@@ -26,8 +26,6 @@ describe('buildCompaniesSearchArgs', () => {
       employeesMax: '500',
       revenueMin: '1000',
       revenueMax: '5000',
-      fundingMin: '500',
-      fundingMax: '10000',
       page: '2',
       pageSize: '50',
     })).toEqual({
@@ -35,8 +33,6 @@ describe('buildCompaniesSearchArgs', () => {
       employeeRangeMaximum: 500,
       revenueMin: 1000,
       revenueMax: 5000,
-      fundingAmountMin: 500,
-      fundingAmountMax: 10000,
       page: 2,
       pageSize: 50,
     });
@@ -54,6 +50,19 @@ describe('buildCompaniesSearchArgs', () => {
       companyTickerList: ['ZI', 'CRM'],
       companyTypeList: ['private', 'public'],
     });
+  });
+
+  it('maps funding round flags to their typed list params', () => {
+    expect(buildCompaniesSearchArgs({ recentFundingRound: 'Series A, Series B' })).toEqual({
+      recentFundingRoundTypes: ['Series A', 'Series B'],
+    });
+    expect(buildCompaniesSearchArgs({ anyFundingRound: 'Angel/Seed' })).toEqual({
+      allFundingRoundTypes: ['Angel/Seed'],
+    });
+  });
+
+  it('rejects recent and any funding round filters together', () => {
+    expect(() => buildCompaniesSearchArgs({ recentFundingRound: 'Seed', anyFundingRound: 'IPO' })).toThrow(/not both/);
   });
 
   it('drops empty strings (falsy in TS so they are skipped)', () => {
@@ -88,5 +97,41 @@ describe('buildCompaniesEnrichEntry', () => {
 
   it('returns a single-key entry when only one identifier is provided', () => {
     expect(buildCompaniesEnrichEntry({ id: '12345' })).toEqual({ companyId: '12345' });
+  });
+});
+
+describe('buildCompaniesSimilarArgs', () => {
+  it('coerces --id to an integer zoominfoCompanyId', () => {
+    expect(buildCompaniesSimilarArgs({ id: '344589814' })).toEqual({ zoominfoCompanyId: 344589814 });
+  });
+
+  it('falls back to companyName when no id is given', () => {
+    expect(buildCompaniesSimilarArgs({ name: 'Stripe' })).toEqual({ companyName: 'Stripe' });
+  });
+
+  it('sets same-attribute filters only when passed, and coerces page size', () => {
+    expect(buildCompaniesSimilarArgs({
+      id: '1',
+      sameIndustry: true,
+      sameCountry: true,
+      sameRevenueRange: true,
+      sameEmployeeRange: true,
+      pageSize: '10',
+    })).toEqual({
+      zoominfoCompanyId: 1,
+      sameIndustry: true,
+      sameCountry: true,
+      sameRevenueRange: true,
+      sameEmployeeRange: true,
+      pageSize: 10,
+    });
+  });
+
+  it('requires --id or --name', () => {
+    expect(() => buildCompaniesSimilarArgs({})).toThrow(/--id or --name/);
+  });
+
+  it('rejects non-integer ids', () => {
+    expect(() => buildCompaniesSimilarArgs({ id: 'stripe.com' })).toThrow(/integer/);
   });
 });

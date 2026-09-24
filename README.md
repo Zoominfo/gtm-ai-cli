@@ -141,7 +141,7 @@ gtm lookup --field tech-products --vendor "HubSpot, Inc"
 gtm lookup --field metro-regions --fuzzy "san francisco"
 ```
 
-Valid `--field` names: `industries`, `metro-regions`, `states`, `countries`, `continents`, `management-levels`, `departments`, `job-functions`, `employee-count`, `revenue-ranges`, `company-types`, `company-rankings`, `intent-topics`, `scoop-topics`, `scoop-types`, `scoop-departments`, `news-categories`, `naics-codes`, `sic-codes`, `tech-vendors`, `tech-products`, `tech-categories`, `tech-skills`, `hashtags`, `buying-groups`, `board-members`, `years-of-experience`, `sub-unit-types`, `job-titles`.
+Valid `--field` names: `industries`, `metro-regions`, `states`, `countries`, `continents`, `management-levels`, `departments`, `job-functions`, `employee-count`, `revenue-ranges`, `funding-round-types`, `company-types`, `company-rankings`, `intent-topics`, `scoop-topics`, `scoop-types`, `scoop-departments`, `news-categories`, `naics-codes`, `sic-codes`, `tech-vendors`, `tech-products`, `tech-categories`, `tech-skills`, `hashtags`, `buying-groups`, `board-members`, `years-of-experience`, `sub-unit-types`, `job-titles`.
 
 ---
 
@@ -162,8 +162,9 @@ gtm companies search --type public --country "United States" --revenue-min 10000
 # Companies using a specific tech product (lookup product IDs first)
 gtm companies search --tech "5f1d1d5c123" --metro "MA - Boston" --employees "250to499,500to999"
 
-# Series A-B funded ($1M-$20M) software companies in the US
-gtm companies search --industry software --country "United States" --funding-min 1000 --funding-max 20000
+# US software companies whose most recent round was Series A or B
+# (use --any-funding-round to match any round in their history instead)
+gtm companies search --industry software --country "United States" --recent-funding-round "Series A,Series B"
 
 # By NAICS / SIC codes
 gtm companies search --naics "541511,541512"
@@ -191,6 +192,9 @@ gtm companies enrich --file companies.json
 ```shell
 gtm companies similar --id 344589814
 gtm companies similar --name "Stripe"
+
+# Narrow to look-alikes that share attributes with the reference company
+gtm companies similar --id 344589814 --same-industry --same-country --page-size 50
 ```
 
 ---
