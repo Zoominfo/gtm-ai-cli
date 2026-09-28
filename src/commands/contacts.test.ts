@@ -6,47 +6,75 @@ describe('buildContactsSearchArgs', () => {
     expect(buildContactsSearchArgs({})).toEqual({});
   });
 
-  it('maps contact-specific flags to MCP arg names', () => {
+  it('maps contact-specific flags to the active *List MCP arg names', () => {
     expect(buildContactsSearchArgs({
       firstName: 'Jane',
       lastName: 'Doe',
       email: 'jane@acme.com',
       jobTitle: 'VP Engineering',
-      managementLevel: 'VP Level Exec',
+      managementLevel: 'VP Level Exec,C Level Exec',
       department: 'Engineering & Technical',
     })).toEqual({
       firstName: 'Jane',
       lastName: 'Doe',
       emailAddress: 'jane@acme.com',
-      jobTitle: 'VP Engineering',
-      managementLevel: 'VP Level Exec',
-      department: 'Engineering & Technical',
+      jobTitleList: ['VP Engineering'],
+      managementLevelList: ['VP Level Exec', 'C Level Exec'],
+      departmentList: ['Engineering & Technical'],
     });
   });
 
-  it('maps company filters through with website renamed', () => {
+  it('splits OR-separated job titles into jobTitleList entries', () => {
+    expect(buildContactsSearchArgs({ jobTitle: 'CFO OR VP Finance OR Treasurer' })).toEqual({
+      jobTitleList: ['CFO', 'VP Finance', 'Treasurer'],
+    });
+  });
+
+  it('maps company filters through with website renamed and IDs coerced', () => {
     expect(buildContactsSearchArgs({
-      companyId: '12345',
+      companyId: '12345,67890',
       companyName: 'Acme',
       companyDomain: 'https://acme.com',
+      industry: 'software,software.health',
     })).toEqual({
-      companyId: '12345',
+      companyIdList: [12345, 67890],
       companyName: 'Acme',
       companyWebsite: 'https://acme.com',
+      industryList: ['software', 'software.health'],
     });
   });
 
-  it('coerces accuracy + paging flags to numbers/booleans correctly', () => {
+  it('maps geographic flags including location scope', () => {
+    expect(buildContactsSearchArgs({
+      metro: 'MA - Boston',
+      zip: '02110',
+      zipRadius: '25',
+      locationType: 'Person',
+    })).toEqual({
+      metroRegion: 'MA - Boston',
+      zipCode: '02110',
+      zipCodeRadiusMiles: '25',
+      locationSearchType: 'Person',
+    });
+  });
+
+  it('coerces accuracy, range, and paging flags to numbers', () => {
     expect(buildContactsSearchArgs({
       accuracyMin: '80',
       accuracyMax: '99',
-      executivesOnly: true,
+      employeesMin: '100',
+      employeesMax: '500',
+      revenueMin: '1000',
+      required: 'email,phone',
       page: '3',
       pageSize: '50',
     })).toEqual({
-      contactAccuracyScoreMin: '80',
-      contactAccuracyScoreMax: '99',
-      executivesOnly: true,
+      contactAccuracyScoreMinimum: 80,
+      contactAccuracyScoreMaximum: 99,
+      employeeRangeMinimum: 100,
+      employeeRangeMaximum: 500,
+      revenueMin: 1000,
+      requiredFieldsList: ['email', 'phone'],
       page: 3,
       pageSize: 50,
     });
