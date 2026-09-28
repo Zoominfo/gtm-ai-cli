@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters } from '../utils.js';
+import { requireSearchFilters, splitList } from '../utils.js';
 
 interface CompaniesSearchOptions {
   name?: string;
@@ -13,6 +13,7 @@ interface CompaniesSearchOptions {
   country?: string;
   continent?: string;
   zip?: string;
+  zipRadius?: string;
   employees?: string;
   employeesMin?: string;
   employeesMax?: string;
@@ -24,10 +25,8 @@ interface CompaniesSearchOptions {
   tech?: string;
   naics?: string;
   sic?: string;
-  fundingMin?: string;
-  fundingMax?: string;
-  fundingStart?: string;
-  fundingEnd?: string;
+  recentFundingRound?: string;
+  anyFundingRound?: string;
   sort?: string;
   page?: string;
   pageSize?: string;
@@ -51,6 +50,11 @@ interface CompaniesEnrichOptions {
 interface CompaniesSimilarOptions {
   id?: string;
   name?: string;
+  sameIndustry?: boolean;
+  sameCountry?: boolean;
+  sameRevenueRange?: boolean;
+  sameEmployeeRange?: boolean;
+  pageSize?: string;
   format?: string;
   select?: string;
 }
@@ -58,31 +62,34 @@ interface CompaniesSimilarOptions {
 // Pure mapping from CLI flags to MCP search_companies arguments.
 // Exported so unit tests can hit it without a network.
 export function buildCompaniesSearchArgs(opts: CompaniesSearchOptions): Record<string, unknown> {
+  if (opts.recentFundingRound && opts.anyFundingRound) {
+    throw new Error('pass either --recent-funding-round or --any-funding-round, not both');
+  }
+
   const args: Record<string, unknown> = {};
 
   if (opts.name) args.companyName = opts.name;
   if (opts.domain) args.companyWebsite = opts.domain;
-  if (opts.industry) args.industryCodes = opts.industry;
+  if (opts.industry) args.industryList = splitList(opts.industry);
   if (opts.metro) args.metroRegion = opts.metro;
   if (opts.state) args.state = opts.state;
   if (opts.country) args.country = opts.country;
   if (opts.continent) args.continent = opts.continent;
   if (opts.zip) args.zipCode = opts.zip;
+  if (opts.zipRadius) args.zipCodeRadiusMiles = opts.zipRadius;
   if (opts.employees) args.employeeCount = opts.employees;
-  if (opts.employeesMin) args.employeeRangeMin = opts.employeesMin;
-  if (opts.employeesMax) args.employeeRangeMax = opts.employeesMax;
+  if (opts.employeesMin) args.employeeRangeMinimum = parseInt(opts.employeesMin, 10);
+  if (opts.employeesMax) args.employeeRangeMaximum = parseInt(opts.employeesMax, 10);
   if (opts.revenue) args.revenue = opts.revenue;
   if (opts.revenueMin) args.revenueMin = parseInt(opts.revenueMin, 10);
   if (opts.revenueMax) args.revenueMax = parseInt(opts.revenueMax, 10);
-  if (opts.type) args.companyType = opts.type;
-  if (opts.ticker) args.companyTicker = opts.ticker;
-  if (opts.tech) args.techAttributeTagList = opts.tech;
+  if (opts.type) args.companyTypeList = splitList(opts.type);
+  if (opts.ticker) args.companyTickerList = opts.ticker;
+  if (opts.tech) args.techAttributeTagIdList = splitList(opts.tech);
   if (opts.naics) args.naicsCodes = opts.naics;
   if (opts.sic) args.sicCodes = opts.sic;
-  if (opts.fundingMin) args.fundingAmountMin = parseInt(opts.fundingMin, 10);
-  if (opts.fundingMax) args.fundingAmountMax = parseInt(opts.fundingMax, 10);
-  if (opts.fundingStart) args.fundingStartDate = opts.fundingStart;
-  if (opts.fundingEnd) args.fundingEndDate = opts.fundingEnd;
+  if (opts.recentFundingRound) args.recentFundingRoundTypes = splitList(opts.recentFundingRound);
+  if (opts.anyFundingRound) args.allFundingRoundTypes = splitList(opts.anyFundingRound);
   if (opts.sort) args.sort = opts.sort;
   if (opts.page) args.page = parseInt(opts.page, 10);
   if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
@@ -102,6 +109,31 @@ export function buildCompaniesEnrichEntry(opts: CompaniesEnrichOptions): Record<
   return Object.keys(entry).length > 0 ? entry : null;
 }
 
+// Pure mapping from CLI flags to MCP find_similar_companies arguments.
+export function buildCompaniesSimilarArgs(opts: CompaniesSimilarOptions): Record<string, unknown> {
+  if (!opts.id && !opts.name) {
+    throw new Error('provide --id or --name');
+  }
+
+  const args: Record<string, unknown> = {};
+
+  if (opts.id) {
+    const n = Number(opts.id);
+    if (!Number.isInteger(n) || n === 0) {
+      throw new Error(`--id must be an integer ZoomInfo company ID (got "${opts.id}")`);
+    }
+    args.zoominfoCompanyId = n;
+  }
+  if (opts.name) args.companyName = opts.name;
+  if (opts.sameIndustry) args.sameIndustry = true;
+  if (opts.sameCountry) args.sameCountry = true;
+  if (opts.sameRevenueRange) args.sameRevenueRange = true;
+  if (opts.sameEmployeeRange) args.sameEmployeeRange = true;
+  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+
+  return args;
+}
+
 export function registerCompanies(program: Command): void {
   const companies = program.command('companies').description('Search, enrich, and find similar companies');
 
@@ -110,27 +142,26 @@ export function registerCompanies(program: Command): void {
     .description("Search ZoomInfo's company database")
     .option('--name <name>', 'Company name')
     .option('--domain <url>', 'Company website (https://example.com)')
-    .option('--industry <codes>', 'Industry codes (comma-separated) — use `gtm lookup --field industries` for valid values')
+    .option('--industry <ids>', 'Industry IDs (comma-separated) — pass the `id` values from `gtm lookup --field industries` (e.g. software.health)')
     .option('--metro <regions>', 'Metro regions (comma-separated) — use `gtm lookup --field metro-regions`')
     .option('--state <states>', 'State or province (comma-separated)')
     .option('--country <countries>', 'Country (comma-separated)')
     .option('--continent <continents>', 'Continent (comma-separated)')
-    .option('--zip <code>', 'Zip / postal code')
+    .option('--zip <code>', 'Zip / postal code (intersected with the other location filters)')
+    .option('--zip-radius <miles>', 'Radius in miles around --zip: 10 | 25 | 50 | 100 | 250')
     .option('--employees <ranges>', 'Employee count ranges, e.g. "100to249,250to499"')
     .option('--employees-min <n>', 'Minimum employee count (granular)')
     .option('--employees-max <n>', 'Maximum employee count (granular)')
     .option('--revenue <ranges>', 'Revenue ranges, e.g. "1Mto5M,10Mto25M"')
     .option('--revenue-min <thousands>', 'Min annual revenue in thousands')
     .option('--revenue-max <thousands>', 'Max annual revenue in thousands')
-    .option('--type <type>', 'Company type: private, public, npo, education, government, other')
+    .option('--type <types>', 'Company type(s), comma-separated: private, public, npo, education, government, other')
     .option('--ticker <symbols...>', 'Stock ticker symbols')
     .option('--tech <productIds>', 'Tech product IDs (comma-separated) — use lookup tech-products')
-    .option('--naics <codes>', 'NAICS codes (comma-separated)')
-    .option('--sic <codes>', 'SIC codes (comma-separated)')
-    .option('--funding-min <thousands>', 'Min funding amount in thousands')
-    .option('--funding-max <thousands>', 'Max funding amount in thousands')
-    .option('--funding-start <YYYY-MM-DD>', 'Funding window start')
-    .option('--funding-end <YYYY-MM-DD>', 'Funding window end')
+    .option('--naics <codes>', 'NAICS codes (comma-separated) (legacy)')
+    .option('--sic <codes>', 'SIC codes (comma-separated) (legacy)')
+    .option('--recent-funding-round <types>', 'Most recent funding round type(s), comma-separated — use `gtm lookup --field funding-round-types`')
+    .option('--any-funding-round <types>', 'Funding round type(s) at any point in history, comma-separated (instead of --recent-funding-round)')
     .option('--sort <field>', 'Sort: name | employeeCount | revenue (prefix - for descending)')
     .option('--page <n>', 'Page number', '1')
     .option('--page-size <n>', 'Results per page (max 100)', '25')
@@ -141,7 +172,7 @@ export function registerCompanies(program: Command): void {
       requireSearchFilters(args, 'gtm companies search', [
         '--name <name>            Company name',
         '--domain <url>           Company website (https://example.com)',
-        '--industry <codes>       Industry codes (use `gtm lookup --field industries`)',
+        '--industry <ids>         Industry IDs (use `gtm lookup --field industries`)',
         '--metro <regions>        Metro regions (use `gtm lookup --field metro-regions`)',
         '--employees <ranges>     Employee count ranges (e.g. "100to249,250to499")',
         '--revenue <ranges>       Revenue ranges (e.g. "1Mto5M,10Mto25M")',
@@ -199,17 +230,15 @@ export function registerCompanies(program: Command): void {
     .description('Find companies similar to a reference company')
     .option('--id <companyId>', 'Reference company ZoomInfo ID (preferred)')
     .option('--name <name>', 'Reference company name (if no ID)')
+    .option('--same-industry', 'Only companies in the same industry as the reference company')
+    .option('--same-country', 'Only companies in the same country')
+    .option('--same-revenue-range', 'Only companies in the same revenue range')
+    .option('--same-employee-range', 'Only companies in the same employee count range')
+    .option('--page-size <n>', 'Results to return (max 100)', '25')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: CompaniesSimilarOptions) => {
-      if (!opts.id && !opts.name) {
-        console.error('Error: provide --id or --name');
-        process.exit(1);
-      }
-      const args: Record<string, unknown> = {};
-      if (opts.id) args.companyId = opts.id;
-      if (opts.name) args.companyName = opts.name;
-      const data = await mcpCall('find_similar_companies', args);
+      const data = await mcpCall('find_similar_companies', buildCompaniesSimilarArgs(opts));
       print(data, opts.format, opts.select);
     });
 }

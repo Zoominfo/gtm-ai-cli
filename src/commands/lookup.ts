@@ -15,12 +15,13 @@ interface LookupOptions {
 
 const LOOKUP_FIELDS = [
   'board-members', 'buying-groups', 'company-rankings', 'company-types',
-  'continents', 'countries', 'departments', 'employee-count', 'hashtags',
-  'industries', 'intent-topics', 'job-functions', 'job-titles',
-  'management-levels', 'metro-regions', 'naics-codes', 'news-categories',
-  'revenue-ranges', 'scoop-departments', 'scoop-topics', 'scoop-types',
-  'sic-codes', 'states', 'sub-unit-types', 'tech-categories', 'tech-products',
-  'tech-skills', 'tech-vendors', 'years-of-experience',
+  'continents', 'countries', 'departments', 'employee-count',
+  'funding-round-types', 'hashtags', 'industries', 'intent-topics',
+  'job-functions', 'job-titles', 'management-levels', 'metro-regions',
+  'naics-codes', 'news-categories', 'revenue-ranges', 'scoop-departments',
+  'scoop-topics', 'scoop-types', 'sic-codes', 'states', 'sub-unit-types',
+  'tech-categories', 'tech-products', 'tech-skills', 'tech-vendors',
+  'years-of-experience',
 ] as const;
 
 export function registerLookup(program: Command): void {

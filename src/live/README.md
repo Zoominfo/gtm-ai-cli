@@ -7,8 +7,8 @@ argument schemas that the MCP rejects with a validation error.
 Implemented suites:
 - `helpers.ts` — spawns the CLI as a subprocess, parses JSON output, gates on login state.
 - `read-only.live.test.ts` — one call per non-mutating command (companies/contacts
-  search·enrich·similar·recommended, intent search·enrich, scoops search·enrich, news
-  enrich, lookup, gtm-context get, research account·contact, raw list-tools·call, plus a
+  search·enrich·similar·recommended, intent search, scoops search, signals, engagements
+  list·ask, lookup, gtm-context get, research account·contact, raw list-tools·call, plus a
   `--select` projection check). IDs are chained from preceding searches; assertions tolerate
   empty result sets and varying response shapes.
 - `writes.live.test.ts` — mutating tools (`feedback submit`, `gtm-context update`), gated.
