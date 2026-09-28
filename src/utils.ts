@@ -61,3 +61,36 @@ export function requireSearchFilters(
   console.error(lines.join('\n'));
   process.exit(1);
 }
+
+// Normalizes the identifier objects from an enrich `--file` before they reach the MCP
+// tool, which silently ignores keys it doesn't recognize. Aliases (CLI flag names, or
+// field names as they appear in enrich output) are renamed to their MCP key; unknown
+// keys and empty entries throw so a typo fails loudly instead of matching nothing.
+export function normalizeEnrichEntries(
+  entries: unknown[],
+  validKeys: readonly string[],
+  aliases: Record<string, string>,
+): Record<string, unknown>[] {
+  return entries.map((raw, i) => {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+      throw new Error(`entry ${i + 1} must be an object`);
+    }
+    const entry: Record<string, unknown> = {};
+    const unknownKeys: string[] = [];
+    for (const [key, value] of Object.entries(raw)) {
+      const mcpKey = aliases[key] ?? key;
+      if (validKeys.includes(mcpKey)) entry[mcpKey] = value;
+      else unknownKeys.push(key);
+    }
+    if (unknownKeys.length > 0) {
+      throw new Error(
+        `entry ${i + 1} has unsupported key(s): ${unknownKeys.join(', ')}. ` +
+        `Supported keys: ${[...validKeys, ...Object.keys(aliases)].join(', ')}`,
+      );
+    }
+    if (Object.keys(entry).length === 0) {
+      throw new Error(`entry ${i + 1} has no identifier`);
+    }
+    return entry;
+  });
+}

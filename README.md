@@ -183,6 +183,9 @@ gtm companies enrich --domain stripe.com --fields name description website reven
 
 # Bulk: up to 10 companies via JSON file
 # companies.json: [{ "domain": "stripe.com" }, { "companyId": "344589814" }]
+# Each entry takes the MCP keys (companyId, companyName, companyWebsite, domain, companyTicker,
+# ipAddress, companyCity, ...) or the flag names (id, name, website, ticker, ip).
+# Unsupported keys are rejected.
 gtm companies enrich --file companies.json
 ```
 
@@ -231,6 +234,9 @@ gtm contacts enrich --email jane@acme.com --fields phone jobTitle managementLeve
 
 # Bulk: up to 10 contacts via JSON file
 # contacts.json: [{ "email": "a@b.com" }, { "personId": "1260398587" }]
+# Each entry takes the MCP keys (personId, email, phone, firstName, lastName, fullName,
+# companyName, companyId, jobTitle, ...) or the flag names (id, company).
+# Unsupported keys are rejected.
 gtm contacts enrich --file contacts.json
 ```
 
