@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters, splitList } from '../utils.js';
+import { requireSearchFilters, splitList, normalizeEnrichEntries } from '../utils.js';
 
 interface ContactsSearchOptions {
   firstName?: string;
@@ -128,6 +128,23 @@ export function buildContactsEnrichEntry(opts: ContactsEnrichOptions): Record<st
   return Object.keys(entry).length > 0 ? entry : null;
 }
 
+// Identifier and filter keys accepted by the MCP enrich_contacts tool.
+const CONTACT_ENRICH_KEYS = [
+  'personId', 'email', 'phone', 'firstName', 'lastName', 'fullName', 'companyName',
+  'companyId', 'jobTitle', 'externalURL', 'contactAccuracyScoreMin',
+  'lastUpdatedDateAfter', 'validDateAfter',
+] as const;
+
+// Friendly names accepted in --file entries, matching the enrich flags.
+const CONTACT_ENRICH_ALIASES: Record<string, string> = {
+  id: 'personId',
+  company: 'companyName',
+};
+
+export function normalizeContactsEnrichEntries(entries: unknown[]): Record<string, unknown>[] {
+  return normalizeEnrichEntries(entries, CONTACT_ENRICH_KEYS, CONTACT_ENRICH_ALIASES);
+}
+
 export function registerContacts(program: Command): void {
   const contacts = program.command('contacts').description('Search, enrich, and find similar contacts');
 
@@ -213,7 +230,12 @@ export function registerContacts(program: Command): void {
           console.error('Error: --file must contain a JSON array of contact identifier objects (or { "contacts": [...] })');
           process.exit(1);
         }
-        contactsArr = arr;
+        try {
+          contactsArr = normalizeContactsEnrichEntries(arr);
+        } catch (err) {
+          console.error(`Error: --file ${(err as Error).message}`);
+          process.exit(1);
+        }
       } else {
         const entry = buildContactsEnrichEntry(opts);
         if (!entry) {

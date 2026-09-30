@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildContactsSearchArgs, buildContactsEnrichEntry } from './contacts.js';
+import { buildContactsSearchArgs, buildContactsEnrichEntry, normalizeContactsEnrichEntries } from './contacts.js';
 
 describe('buildContactsSearchArgs', () => {
   it('omits all keys when no flags are passed', () => {
@@ -111,5 +111,22 @@ describe('buildContactsEnrichEntry', () => {
       fullName: 'Jane Doe',
       companyId: '12345',
     });
+  });
+});
+
+describe('normalizeContactsEnrichEntries', () => {
+  it('passes MCP identifier keys through unchanged', () => {
+    const entries = [{ email: 'jane@acme.com' }, { firstName: 'Jane', lastName: 'Doe', companyName: 'Acme' }];
+    expect(normalizeContactsEnrichEntries(entries)).toEqual(entries);
+  });
+
+  it('maps flag-style aliases to MCP keys', () => {
+    expect(normalizeContactsEnrichEntries([{ id: '1260398587' }, { fullName: 'Jane Doe', company: 'Acme' }]))
+      .toEqual([{ personId: '1260398587' }, { fullName: 'Jane Doe', companyName: 'Acme' }]);
+  });
+
+  it('rejects unsupported keys instead of dropping them', () => {
+    expect(() => normalizeContactsEnrichEntries([{ emailAddress: 'jane@acme.com' }]))
+      .toThrow(/entry 1 has unsupported key\(s\): emailAddress/);
   });
 });

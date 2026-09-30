@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters, splitList } from '../utils.js';
+import { requireSearchFilters, splitList, normalizeEnrichEntries } from '../utils.js';
 
 interface CompaniesSearchOptions {
   name?: string;
@@ -109,6 +109,26 @@ export function buildCompaniesEnrichEntry(opts: CompaniesEnrichOptions): Record<
   return Object.keys(entry).length > 0 ? entry : null;
 }
 
+// Identifier keys accepted by the MCP enrich_companies tool.
+const COMPANY_ENRICH_KEYS = [
+  'companyId', 'companyName', 'companyWebsite', 'domain', 'companyTicker', 'ipAddress',
+  'companyPhone', 'companyFax', 'companyStreet', 'companyCity', 'companyState',
+  'companyZipCode', 'companyCountry',
+] as const;
+
+// Friendly names accepted in --file entries, matching the enrich flags.
+const COMPANY_ENRICH_ALIASES: Record<string, string> = {
+  id: 'companyId',
+  name: 'companyName',
+  website: 'companyWebsite',
+  ticker: 'companyTicker',
+  ip: 'ipAddress',
+};
+
+export function normalizeCompaniesEnrichEntries(entries: unknown[]): Record<string, unknown>[] {
+  return normalizeEnrichEntries(entries, COMPANY_ENRICH_KEYS, COMPANY_ENRICH_ALIASES);
+}
+
 // Pure mapping from CLI flags to MCP find_similar_companies arguments.
 export function buildCompaniesSimilarArgs(opts: CompaniesSimilarOptions): Record<string, unknown> {
   if (!opts.id && !opts.name) {
@@ -208,7 +228,12 @@ export function registerCompanies(program: Command): void {
           console.error('Error: --file must contain a JSON array of company identifier objects (or { "companies": [...] })');
           process.exit(1);
         }
-        companiesArr = arr;
+        try {
+          companiesArr = normalizeCompaniesEnrichEntries(arr);
+        } catch (err) {
+          console.error(`Error: --file ${(err as Error).message}`);
+          process.exit(1);
+        }
       } else {
         const entry = buildCompaniesEnrichEntry(opts);
         if (!entry) {

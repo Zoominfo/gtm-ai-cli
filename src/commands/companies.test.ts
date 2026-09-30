@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCompaniesSearchArgs, buildCompaniesEnrichEntry, buildCompaniesSimilarArgs } from './companies.js';
+import { buildCompaniesSearchArgs, buildCompaniesEnrichEntry, buildCompaniesSimilarArgs,normalizeCompaniesEnrichEntries } from './companies.js';
 
 describe('buildCompaniesSearchArgs', () => {
   it('omits all keys when no flags are passed', () => {
@@ -133,5 +133,32 @@ describe('buildCompaniesSimilarArgs', () => {
 
   it('rejects non-integer ids', () => {
     expect(() => buildCompaniesSimilarArgs({ id: 'stripe.com' })).toThrow(/integer/);
+  });
+});
+
+describe('normalizeCompaniesEnrichEntries', () => {
+  it('passes MCP identifier keys through unchanged', () => {
+    const entries = [{ domain: 'stripe.com' }, { companyWebsite: 'https://acme.com' }, { companyId: '12345' }];
+    expect(normalizeCompaniesEnrichEntries(entries)).toEqual(entries);
+  });
+
+  it('maps flag-style aliases to MCP keys', () => {
+    expect(normalizeCompaniesEnrichEntries([
+      { website: 'https://stripe.com' },
+      { id: '12345', name: 'Acme', ticker: 'ACME', ip: '8.8.8.8' },
+    ])).toEqual([
+      { companyWebsite: 'https://stripe.com' },
+      { companyId: '12345', companyName: 'Acme', companyTicker: 'ACME', ipAddress: '8.8.8.8' },
+    ]);
+  });
+
+  it('rejects unsupported keys instead of dropping them', () => {
+    expect(() => normalizeCompaniesEnrichEntries([{ domain: 'stripe.com' }, { url: 'acme.com' }]))
+      .toThrow(/entry 2 has unsupported key\(s\): url/);
+  });
+
+  it('rejects empty and non-object entries', () => {
+    expect(() => normalizeCompaniesEnrichEntries([{}])).toThrow(/entry 1 has no identifier/);
+    expect(() => normalizeCompaniesEnrichEntries(['stripe.com'])).toThrow(/entry 1 must be an object/);
   });
 });
