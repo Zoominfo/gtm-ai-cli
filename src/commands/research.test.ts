@@ -13,7 +13,7 @@ describe('buildAccountResearchArgs', () => {
     expect(() => buildAccountResearchArgs({ companyId: 'abc', query: 'x' })).toThrow(/--company-id/);
   });
 
-  it('throws on a zero or negative company ID', () => {
+  it('throws on a zero company ID', () => {
     expect(() => buildAccountResearchArgs({ companyId: '0', query: 'x' })).toThrow(/--company-id/);
   });
 });
@@ -28,5 +28,9 @@ describe('buildContactResearchArgs', () => {
 
   it('throws on a non-numeric contact ID', () => {
     expect(() => buildContactResearchArgs({ contactId: '12.5', query: 'x' })).toThrow(/--contact-id/);
+  });
+
+  it('accepts a negative contact ID', () => {
+    expect(buildContactResearchArgs({ contactId: '-2032531906', query: 'x' }).zoominfoContactId).toBe(-2032531906);
   });
 });

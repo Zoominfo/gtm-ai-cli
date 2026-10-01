@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
+import { parseInteger, parseId } from '../utils.js';
 
 interface EngagementsListOptions {
   companyId?: string;
@@ -24,16 +25,6 @@ interface EngagementsAskOptions {
   select?: string;
 }
 
-// ZoomInfo IDs are integers. Validate + coerce here so a bad ID fails fast
-// with a clear message rather than reaching the MCP as NaN.
-function parseId(value: string, flag: string): number {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n === 0) {
-    throw new Error(`${flag} must be an integer ZoomInfo ID (got "${value}")`);
-  }
-  return n;
-}
-
 // Pure mappers from CLI flags to MCP engagement-tool arguments. Exported for unit tests.
 export function buildEngagementsListArgs(opts: EngagementsListOptions): Record<string, unknown> {
   const args: Record<string, unknown> = {};
@@ -43,7 +34,7 @@ export function buildEngagementsListArgs(opts: EngagementsListOptions): Record<s
   if (opts.start) args.engagementDateStart = opts.start;
   if (opts.end) args.engagementDateEnd = opts.end;
   if (opts.type) args.engagementType = opts.type.toUpperCase();
-  if (opts.limit) args.engagementLimit = parseInt(opts.limit, 10);
+  if (opts.limit) args.engagementLimit = parseInteger(opts.limit, '--limit');
   if (opts.sort) args.sort = opts.sort;
 
   return args;
