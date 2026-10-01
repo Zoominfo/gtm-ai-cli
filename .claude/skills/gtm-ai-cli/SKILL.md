@@ -277,7 +277,7 @@ Every subcommand accepts `-f, --format <format>`:
 | Format | When to use |
 |---|---|
 | `json` (default) | Pretty-printed JSON, preserves exact response shape. Pipe to `jq`. |
-| `jsonl` | One JSON object per line. Stream into log/data pipelines. |
+| `jsonl` | One record per line (list responses are unwrapped from their envelope). Stream into log/data pipelines. |
 | `csv` | Flat CSV with headers; one-level-nested objects are dot-flattened (`company.name`), arrays are JSON-stringified. |
 | `yaml` | Human-readable diffs of deeply nested responses. |
 | `table` | ASCII bordered table. JSON:API envelopes are auto-unwrapped and `attributes` is hoisted to top-level columns. Best for terminal browsing of small responses. |
