@@ -1,13 +1,21 @@
+import { InvalidArgumentError } from 'commander';
 import { dump } from 'js-yaml';
 import type { OutputFormat } from './types.js';
 
 const VALID_FORMATS: readonly OutputFormat[] = ['json', 'jsonl', 'csv', 'yaml', 'table'];
 
+// Validated while parsing flags, so a bad --format fails before any MCP call is made.
+function parseFormat(value: string): OutputFormat {
+  if (!isOutputFormat(value)) throw new InvalidArgumentError(`Valid options: ${VALID_FORMATS.join(', ')}`);
+  return value;
+}
+
 export const FORMAT_OPTION = [
   '-f, --format <format>',
   'Output format: json, jsonl, csv, yaml, table',
+  parseFormat,
   'json',
-] as const satisfies readonly [string, string, string];
+] as const satisfies readonly [string, string, (value: string) => OutputFormat, OutputFormat];
 
 // Client-side output projection. Named `--select` (not `--fields`) to avoid colliding
 // with the enrich commands' existing `--fields`, which selects server-side requiredFields.
