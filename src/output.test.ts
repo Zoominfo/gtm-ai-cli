@@ -28,6 +28,40 @@ describe('projectFields', () => {
   });
 });
 
+describe('bulk enrich responses', () => {
+  const NO_MATCH = 'Company enrichment failed: NO_MATCH';
+  const bulk = {
+    company_1: { success: true, input: { companyWebsite: 'acme.com' }, data: { id: '1', name: 'Acme' } },
+    company_2: { success: false, input: { companyWebsite: 'missing.example' }, error: NO_MATCH },
+    company_3: { success: true, input: { companyWebsite: 'globex.com' }, data: { id: '3', name: 'Globex' } },
+    totalEnriched: 2,
+    totalErrors: 1,
+  };
+
+  it('keeps one row per input, in order, including misses', () => {
+    expect(normalizeRows(bulk)).toEqual([
+      { id: '1', name: 'Acme' },
+      { 'inputCriteria.companyWebsite': 'missing.example', error: NO_MATCH },
+      { id: '3', name: 'Globex' },
+    ]);
+  });
+
+  it('keeps projected rows aligned with their inputs', () => {
+    expect(projectFields(bulk, ['id', 'error'])).toEqual([
+      { id: '1', error: undefined },
+      { id: undefined, error: NO_MATCH },
+      { id: '3', error: undefined },
+    ]);
+  });
+
+  it('returns a row for a batch where every input misses', () => {
+    const allMissed = { company_1: bulk.company_2, totalEnriched: 0, totalErrors: 1 };
+    expect(normalizeRows(allMissed)).toEqual([
+      { 'inputCriteria.companyWebsite': 'missing.example', error: NO_MATCH },
+    ]);
+  });
+});
+
 describe('normalizeRows', () => {
   it('unwraps a single-key envelope holding an array of objects', () => {
     expect(normalizeRows({ industries: [{ id: 'a' }, { id: 'b' }] })).toEqual([{ id: 'a' }, { id: 'b' }]);

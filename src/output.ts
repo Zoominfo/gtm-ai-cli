@@ -30,6 +30,16 @@ function toRows(data: unknown): Row[] {
 //   { data: [...], meta: {...} }                                    (JSON:API search)
 //   { industries: { data: [...] } }                                 (lookup — two-level wrapper)
 //   { company_1: {data: {...}}, company_2: {...}, totalEnriched }   (ZoomInfo bulk enrich)
+function isObject(v: unknown): v is Row {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+// A bulk-enrich result: `{ success, input, data }` on a match, `{ success: false, input, error }`
+// on a miss. Array `.data` values don't qualify, so the `lookup` two-level shape is unaffected.
+function isBulkResult(v: unknown): v is Row {
+  return isObject(v) && (isObject(v.data) || (typeof v.success === 'boolean' && 'input' in v));
+}
+
 function unwrapEnvelope(rows: Row[]): Row[] {
   for (let depth = 0; depth < 4; depth++) {
     if (rows.length !== 1) return rows;
@@ -43,16 +53,11 @@ function unwrapEnvelope(rows: Row[]): Row[] {
     );
     if (arrayEntry) return arrayEntry[1] as Row[];
 
-    // 2) Bulk-enrich shape: sibling envelopes each holding an object `.data`. Extract
-    //    each `.data` payload as a row. Array `.data` values are left alone so the
-    //    `lookup` two-level shape still resolves via step 3.
-    const dataEnvelopes = entries.filter(([, v]) => {
-      if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-      const inner = (v as Row).data;
-      return inner !== null && typeof inner === 'object' && !Array.isArray(inner);
-    });
-    if (dataEnvelopes.length > 0) {
-      return dataEnvelopes.map(([, v]) => (v as Row).data as Row);
+    // 2) Bulk-enrich shape: one row per input, in input order. Misses keep their row
+    //    (input + error) so results stay aligned with the inputs that produced them.
+    const results = Object.values(envelope).filter(isBulkResult);
+    if (results.length > 0) {
+      return results.map(r => (isObject(r.data) ? r.data : { inputCriteria: r.input, error: r.error }));
     }
 
     // 3) Single-key wrapper — descend into it (e.g. lookup, gtm-context's `result`).
