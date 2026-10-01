@@ -52,18 +52,16 @@ interface McpToolResult {
 }
 
 // Best-effort parse: handles plain JSON, double-encoded JSON strings, and prose
-// preambles followed by JSON (e.g. `lookup` returns "Found 17 items:\n\n{...}").
-function tryParseJson(txt: string): { ok: true; value: unknown } | { ok: false } {
+// preambles followed by JSON (e.g. `lookup` returns "... found 6 total items:\n{...}").
+// Exported for unit tests.
+export function tryParseJson(txt: string): { ok: true; value: unknown } | { ok: false } {
   try { return { ok: true, value: JSON.parse(txt) }; } catch { /* fall through */ }
-  // Strip a prose preamble separated from JSON by a blank line.
-  // We use `\n\n` as the boundary because `[brackets]` show up in prose (e.g. "[industries]")
-  // and would mislead a naive first-bracket scan.
-  const sep = txt.indexOf('\n\n');
-  if (sep >= 0) {
-    const tail = txt.slice(sep + 2).trimStart();
-    if (tail.startsWith('{') || tail.startsWith('[')) {
-      try { return { ok: true, value: JSON.parse(tail) }; } catch { /* fall through */ }
-    }
+  // Strip a prose preamble: the JSON starts on the first line that opens with `{` or `[`.
+  // Anchoring to a line start keeps `[brackets]` inside the prose (e.g. "[industries]")
+  // from misleading the scan.
+  const start = txt.search(/\n\s*[{[]/);
+  if (start >= 0) {
+    try { return { ok: true, value: JSON.parse(txt.slice(start)) }; } catch { /* fall through */ }
   }
   return { ok: false };
 }

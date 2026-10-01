@@ -23,6 +23,15 @@ describe('projectFields', () => {
     expect(projectFields(data, ['id', 'name'])).toEqual({ id: 1, name: 'Acme' });
   });
 
+  it('projects a one-hit search to an array', () => {
+    const data = { data: [{ id: 1, name: 'Acme' }], meta: { totalResults: 1 } };
+    expect(projectFields(data, ['id'])).toEqual([{ id: 1 }]);
+  });
+
+  it('projects a no-hit search to an empty array', () => {
+    expect(projectFields({ data: [], meta: { totalResults: 0 } }, ['id'])).toEqual([]);
+  });
+
   it('yields undefined for missing paths', () => {
     expect(projectFields({ id: 1 }, ['id', 'missing.deep'])).toEqual({ id: 1, 'missing.deep': undefined });
   });
@@ -65,6 +74,15 @@ describe('bulk enrich responses', () => {
 describe('normalizeRows', () => {
   it('unwraps a single-key envelope holding an array of objects', () => {
     expect(normalizeRows({ industries: [{ id: 'a' }, { id: 'b' }] })).toEqual([{ id: 'a' }, { id: 'b' }]);
+  });
+
+  it('unwraps the lookup per-field wrapper to its values', () => {
+    const data = { industries: [{ fuzzyMatch: null, data: [{ id: 'a' }, { id: 'b' }] }] };
+    expect(normalizeRows(data)).toEqual([{ id: 'a' }, { id: 'b' }]);
+  });
+
+  it('yields no rows for an empty search', () => {
+    expect(normalizeRows({ data: [], meta: { totalResults: 0 } })).toEqual([]);
   });
 
   it('hoists JSON:API attributes to top-level columns', () => {
