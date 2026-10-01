@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters } from '../utils.js';
+import { requireSearchFilters, splitList, parseInteger } from '../utils.js';
 
 interface ScoopsSearchOptions {
   scoopIds?: string[];
@@ -32,31 +32,35 @@ interface ScoopsSearchOptions {
   select?: string;
 }
 
+// Variadic list flags also accept comma-separated values, like the other search commands.
+// Job titles are passed verbatim since a title can itself contain a comma.
+const list = (values: string[]): string[] => values.flatMap(splitList);
+
 export function buildScoopsSearchArgs(opts: ScoopsSearchOptions): Record<string, unknown> {
   const args: Record<string, unknown> = {};
 
-  if (opts.scoopIds) args.scoopIds = opts.scoopIds;
-  if (opts.scoopTypes) args.scoopTypes = opts.scoopTypes;
-  if (opts.scoopTopics) args.scoopTopics = opts.scoopTopics;
-  if (opts.department) args.department = opts.department;
+  if (opts.scoopIds) args.scoopIds = list(opts.scoopIds);
+  if (opts.scoopTypes) args.scoopTypes = list(opts.scoopTypes);
+  if (opts.scoopTopics) args.scoopTopics = list(opts.scoopTopics);
+  if (opts.department) args.department = list(opts.department);
   if (opts.description) args.description = opts.description;
   if (opts.publishedStart) args.publishedStartDate = opts.publishedStart;
   if (opts.publishedEnd) args.publishedEndDate = opts.publishedEnd;
   if (opts.updatedSinceCreation) args.updatedSinceCreation = true;
-  if (opts.industry) args.industryCodes = opts.industry;
-  if (opts.metro) args.metroRegions = opts.metro;
+  if (opts.industry) args.industryCodes = list(opts.industry);
+  if (opts.metro) args.metroRegions = list(opts.metro);
   if (opts.state) args.state = opts.state;
   if (opts.country) args.country = opts.country;
   if (opts.zip) args.zipCode = opts.zip;
   if (opts.zipRadius) args.zipCodeRadiusMiles = opts.zipRadius;
   if (opts.locationType) args.locationSearchType = opts.locationType;
-  if (opts.employees) args.employeeCount = opts.employees;
+  if (opts.employees) args.employeeCount = list(opts.employees);
   if (opts.revenue) args.revenue = opts.revenue;
-  if (opts.managementLevel) args.managementLevels = opts.managementLevel;
+  if (opts.managementLevel) args.managementLevels = list(opts.managementLevel);
   if (opts.jobTitle) args.jobTitle = opts.jobTitle;
   if (opts.sort) args.sort = opts.sort;
-  if (opts.page) args.page = parseInt(opts.page, 10);
-  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+  if (opts.page) args.page = parseInteger(opts.page, '--page');
+  if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
 
   return args;
 }
