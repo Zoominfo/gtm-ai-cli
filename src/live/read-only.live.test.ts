@@ -28,7 +28,7 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     const ct = runJson(['contacts', 'search', '--company-name', 'ZoomInfo', '--page-size', '1']);
     personId = pickField(records(ct.data)[0], PERSON_ID_KEYS);
 
-    const topics = runJson(['lookup', '--field', 'intent-topics', '--fuzzy', 'cloud']);
+    const topics = runJson(['lookup', '--field', 'intent-topics', '--fuzzy', 'cloud', '--select', 'name']);
     intentTopic = pickField(records(topics.data)[0], NAME_KEYS);
   }, 90_000);
 
