@@ -1,13 +1,21 @@
+import { InvalidArgumentError } from 'commander';
 import { dump } from 'js-yaml';
 import type { OutputFormat } from './types.js';
 
 const VALID_FORMATS: readonly OutputFormat[] = ['json', 'jsonl', 'csv', 'yaml', 'table'];
 
+// Validated while parsing flags, so a bad --format fails before any MCP call is made.
+function parseFormat(value: string): OutputFormat {
+  if (!isOutputFormat(value)) throw new InvalidArgumentError(`Valid options: ${VALID_FORMATS.join(', ')}`);
+  return value;
+}
+
 export const FORMAT_OPTION = [
   '-f, --format <format>',
   'Output format: json, jsonl, csv, yaml, table',
+  parseFormat,
   'json',
-] as const satisfies readonly [string, string, string];
+] as const satisfies readonly [string, string, (value: string) => OutputFormat, OutputFormat];
 
 // Client-side output projection. Named `--select` (not `--fields`) to avoid colliding
 // with the enrich commands' existing `--fields`, which selects server-side requiredFields.
@@ -24,48 +32,63 @@ function toRows(data: unknown): Row[] {
   return [{ value: data }];
 }
 
-// Find a single-row envelope's array-of-objects and unwrap to it.
-// Recurses through single-key object wrappers so it handles all of:
+function isObject(v: unknown): v is Row {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+// A bulk-enrich result: `{ success, input, data }` on a match, `{ success: false, input, error }`
+// on a miss. Array `.data` values don't qualify, so the `lookup` shape is unaffected.
+function isBulkResult(v: unknown): v is Row {
+  return isObject(v) && (isObject(v.data) || (typeof v.success === 'boolean' && 'input' in v));
+}
+
+// Find the records inside a response envelope. `list` says whether they came from a
+// list, so a one-hit search still projects to an array. Handles all of:
+//   { data: [...], meta: {...} }                                    (JSON:API search, incl. empty)
 //   { total: N, items: [...] }                                      (apollo-style)
-//   { data: [...], meta: {...} }                                    (JSON:API search)
-//   { industries: { data: [...] } }                                 (lookup — two-level wrapper)
+//   { industries: [{ fuzzyMatch, data: [...] }] }                   (lookup)
 //   { company_1: {data: {...}}, company_2: {...}, totalEnriched }   (ZoomInfo bulk enrich)
-function unwrapEnvelope(rows: Row[]): Row[] {
-  for (let depth = 0; depth < 4; depth++) {
-    if (rows.length !== 1) return rows;
-    const envelope = rows[0];
-    if (!envelope || typeof envelope !== 'object') return rows;
-    const entries = Object.entries(envelope);
+//   { result: {...} }                                               (single-key wrapper)
+function unwrapEnvelope(data: unknown): { rows: Row[]; list: boolean } {
+  if (Array.isArray(data)) return { rows: data as Row[], list: true };
 
-    // 1) Prefer any key whose value is a non-empty array of objects.
-    const arrayEntry = entries.find(([, v]) =>
-      Array.isArray(v) && v.length > 0 && typeof v[0] === 'object',
-    );
-    if (arrayEntry) return arrayEntry[1] as Row[];
-
-    // 2) Bulk-enrich shape: sibling envelopes each holding an object `.data`. Extract
-    //    each `.data` payload as a row. Array `.data` values are left alone so the
-    //    `lookup` two-level shape still resolves via step 3.
-    const dataEnvelopes = entries.filter(([, v]) => {
-      if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-      const inner = (v as Row).data;
-      return inner !== null && typeof inner === 'object' && !Array.isArray(inner);
-    });
-    if (dataEnvelopes.length > 0) {
-      return dataEnvelopes.map(([, v]) => (v as Row).data as Row);
+  let record = data;
+  for (let depth = 0; depth < 4 && isObject(record); depth++) {
+    // 1) A JSON:API `data` array, even when empty, so a search with no hits yields no rows.
+    if (Array.isArray(record.data) && record.data.every(isObject)) {
+      return { rows: record.data, list: true };
     }
 
-    // 3) Single-key wrapper — descend into it (e.g. lookup, gtm-context's `result`).
-    if (entries.length === 1) {
-      const value = entries[0][1];
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        rows = [value as Row];
+    // 2) Any key whose value is a non-empty array of objects. Lookup nests each field's
+    //    values one level deeper, as a lone `{ fuzzyMatch, data: [...] }` wrapper.
+    const items = Object.values(record).find(
+      (v): v is Row[] => Array.isArray(v) && v.length > 0 && isObject(v[0]),
+    );
+    if (items) {
+      if (items.length === 1 && Array.isArray(items[0].data)) {
+        record = items[0];
         continue;
       }
+      return { rows: items, list: true };
     }
-    return rows;
+
+    // 3) Bulk-enrich shape: one row per input, in input order. Misses keep their row
+    //    (input + error) so results stay aligned with the inputs that produced them.
+    //    A single-target enrich stays a lone record.
+    const results = Object.values(record).filter(isBulkResult);
+    if (results.length > 0) {
+      return {
+        rows: results.map(r => (isObject(r.data) ? r.data : { inputCriteria: r.input, error: r.error })),
+        list: results.length > 1,
+      };
+    }
+
+    // 4) Single-key wrapper — descend into it (e.g. gtm-context's `result`).
+    const values = Object.values(record);
+    if (values.length !== 1 || !isObject(values[0])) break;
+    record = values[0];
   }
-  return rows;
+  return { rows: toRows(record), list: false };
 }
 
 // JSON:API-flavored shape: { id, type, attributes:{...}, relationships? }.
@@ -104,7 +127,7 @@ function flattenOneLevel(rows: Row[]): Row[] {
 
 // Pipeline shared by table + CSV: unwrap → JSON:API hoist → one-level dot flatten.
 export function normalizeRows(data: unknown): Row[] {
-  return flattenOneLevel(flattenJsonApi(unwrapEnvelope(toRows(data))));
+  return flattenOneLevel(flattenJsonApi(unwrapEnvelope(data).rows));
 }
 
 // Dotted-path getter: getPath({a:{b:1}}, "a.b") → 1.
@@ -116,15 +139,15 @@ function getPath(obj: unknown, path: string): unknown {
 }
 
 // Project each record down to the requested dotted paths, keyed by the path string.
-// Unwraps the response envelope first so projection runs over the record array, and
-// preserves the singular/array shape of the input.
+// Unwraps the response envelope first so projection runs over the record array. A list
+// response always projects to an array (whatever the hit count); a lone record stays an object.
 export function projectFields(data: unknown, paths: string[]): unknown {
   const pick = (row: unknown): Row => Object.fromEntries(paths.map(p => [p, getPath(row, p)]));
-  // Unwrap the envelope and hoist JSON:API `attributes` so intuitive paths like `name` or
-  // `revenue` resolve, while getPath still handles genuinely-nested paths (e.g. company.id).
-  const rows = flattenJsonApi(unwrapEnvelope(toRows(data)));
-  // Preserve the input's singular/array shape: a lone record stays an object.
-  return rows.length === 1 && !Array.isArray(data) ? pick(rows[0]) : rows.map(pick);
+  // Hoist JSON:API `attributes` so intuitive paths like `name` or `revenue` resolve, while
+  // getPath still handles genuinely-nested paths (e.g. company.id).
+  const { rows, list } = unwrapEnvelope(data);
+  const picked = flattenJsonApi(rows).map(pick);
+  return list ? picked : picked[0];
 }
 
 function allKeys(rows: Row[]): string[] {
@@ -291,7 +314,7 @@ export function print(data: unknown, format: string | undefined, select?: string
 
   switch (format as OutputFormat | undefined) {
     case 'jsonl':
-      toRows(out).forEach(row => console.log(JSON.stringify(row)));
+      unwrapEnvelope(out).rows.forEach(row => console.log(JSON.stringify(row)));
       break;
     case 'csv':
       console.log(toCsv(normalizeRows(out)));

@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
+import { parseId } from '../utils.js';
 
 interface AccountResearchOptions {
   companyId: string;
@@ -14,16 +15,6 @@ interface ContactResearchOptions {
   query: string;
   format?: string;
   select?: string;
-}
-
-// ZoomInfo IDs are positive integers. Validate + coerce here so a bad ID fails fast
-// with a clear message rather than reaching the MCP as NaN.
-function parseId(value: string, flag: string): number {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) {
-    throw new Error(`${flag} must be a positive integer ZoomInfo ID (got "${value}")`);
-  }
-  return n;
 }
 
 // Pure mappers from CLI flags to research-tool arguments. Exported for unit tests.

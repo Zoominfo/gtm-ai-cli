@@ -24,7 +24,8 @@ export function registerAuth(program: Command): void {
     .command('logout')
     .description('Revoke the current token and remove saved credentials')
     .action(async () => {
-      const creds = loadCredentials();
+      let creds: Credentials | null = null;
+      try { creds = loadCredentials(); } catch { /* unreadable file — still clear it below */ }
       if (creds) {
         try { await revokeToken(creds.access_token, creds.client_id); } catch { /* best effort */ }
       }
@@ -44,18 +45,15 @@ export function registerAuth(program: Command): void {
         credentials = null;
       }
 
-      if (!credentials) {
-        console.log('No valid user found. Run `gtm auth login` to authenticate.');
-        return;
-      }
-
       const accessTokenParts = credentials?.access_token?.split('.');
-      if ((accessTokenParts?.length ?? 0) !== 3) {
-        console.log('No valid user found. Run `gtm auth login` to authenticate.');
+      if (accessTokenParts?.length !== 3) {
+        console.error('No valid user found. Run `gtm auth login` to authenticate.');
+        process.exitCode = 1;
         return;
       }
 
-      const { firstName, lastName, ziUsername } = JSON.parse(atob(accessTokenParts[1])) as { firstName: string, lastName: string, ziUsername: string };
+      // JWT payloads are base64url-encoded UTF-8 JSON.
+      const { firstName, lastName, ziUsername } = JSON.parse(Buffer.from(accessTokenParts[1], 'base64url').toString('utf8')) as { firstName: string, lastName: string, ziUsername: string };
       console.log(`Logged in as ${firstName} ${lastName} (${ziUsername})`);
     });
 }

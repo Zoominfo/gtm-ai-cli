@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
+import { parseInteger } from '../utils.js';
 
 interface IntentSearchOptions {
   topics: string[];
@@ -31,8 +32,8 @@ interface IntentSearchOptions {
 export function buildIntentSearchArgs(opts: IntentSearchOptions): Record<string, unknown> {
   const args: Record<string, unknown> = { topics: opts.topics };
 
-  if (opts.signalScoreMin) args.signalScoreMin = parseInt(opts.signalScoreMin, 10);
-  if (opts.signalScoreMax) args.signalScoreMax = parseInt(opts.signalScoreMax, 10);
+  if (opts.signalScoreMin) args.signalScoreMin = parseInteger(opts.signalScoreMin, '--signal-score-min');
+  if (opts.signalScoreMax) args.signalScoreMax = parseInteger(opts.signalScoreMax, '--signal-score-max');
   if (opts.audienceStrengthMin) args.audienceStrengthMin = opts.audienceStrengthMin;
   if (opts.audienceStrengthMax) args.audienceStrengthMax = opts.audienceStrengthMax;
   if (opts.signalStart) args.signalStartDate = opts.signalStart;
@@ -49,8 +50,8 @@ export function buildIntentSearchArgs(opts: IntentSearchOptions): Record<string,
   if (opts.tech) args.techAttributeTagList = opts.tech;
   if (opts.recommendedContacts) args.findRecommendedContacts = true;
   if (opts.sort) args.sort = opts.sort;
-  if (opts.page) args.page = parseInt(opts.page, 10);
-  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+  if (opts.page) args.page = parseInteger(opts.page, '--page');
+  if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
 
   return args;
 }

@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
+import { parseId } from '../utils.js';
 
 interface SignalsOptions {
   companyIds: string[];
@@ -17,15 +18,9 @@ export function buildSignalsArgs(opts: SignalsOptions): Record<string, unknown> 
   if (opts.companyIds.length < 1 || opts.companyIds.length > 10) {
     throw new Error(`--company-ids accepts 1-10 IDs (got ${opts.companyIds.length})`);
   }
-  const ids = opts.companyIds.map((raw) => {
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n === 0) {
-      throw new Error(`--company-ids must be integer ZoomInfo company IDs (got "${raw}")`);
-    }
-    return n;
-  });
-
-  const args: Record<string, unknown> = { zoominfoCompanyIds: ids };
+  const args: Record<string, unknown> = {
+    zoominfoCompanyIds: opts.companyIds.map((id) => parseId(id, '--company-ids')),
+  };
 
   if (opts.types && opts.types.length > 0) {
     const types = opts.types.map((t) => t.toUpperCase());

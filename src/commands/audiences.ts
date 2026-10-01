@@ -2,6 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
+import { parseInteger } from '../utils.js';
 
 // GTM Studio audiences. The write tools (create/update/columns/rows) drive a downstream
 // AI agent via an agentInstruction, so those commands require --instruction — a complete,
@@ -77,8 +78,8 @@ export function buildAudiencesListArgs(opts: AudiencesListOptions): Record<strin
   if (opts.search) args.searchText = opts.search;
   if (opts.type) args.type = opts.type.toUpperCase();
   if (opts.createdBy) args.createdByName = opts.createdBy;
-  if (opts.page) args.pageNumber = parseInt(opts.page, 10);
-  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+  if (opts.page) args.pageNumber = parseInteger(opts.page, '--page');
+  if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
   return args;
 }
 
@@ -87,7 +88,7 @@ export function buildAudiencesGetArgs(opts: AudiencesGetOptions): Record<string,
   if (opts.preview !== undefined) {
     args.previewRows = true;
     // --preview with a value sets the row limit; bare --preview uses the server default (5).
-    if (typeof opts.preview === 'string') args.previewRowLimit = parseInt(opts.preview, 10);
+    if (typeof opts.preview === 'string') args.previewRowLimit = parseInteger(opts.preview, '--preview');
     if (opts.previewColumns && opts.previewColumns.length > 0) args.previewColumnIds = opts.previewColumns;
     if (opts.rowFilter) args.rowFilter = JSON.parse(opts.rowFilter);
   }

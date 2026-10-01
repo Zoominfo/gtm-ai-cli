@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters, splitList, normalizeEnrichEntries } from '../utils.js';
+import { requireSearchFilters, splitList, normalizeEnrichEntries, parseInteger, parseId } from '../utils.js';
 
 interface CompaniesSearchOptions {
   name?: string;
@@ -78,11 +78,11 @@ export function buildCompaniesSearchArgs(opts: CompaniesSearchOptions): Record<s
   if (opts.zip) args.zipCode = opts.zip;
   if (opts.zipRadius) args.zipCodeRadiusMiles = opts.zipRadius;
   if (opts.employees) args.employeeCount = opts.employees;
-  if (opts.employeesMin) args.employeeRangeMinimum = parseInt(opts.employeesMin, 10);
-  if (opts.employeesMax) args.employeeRangeMaximum = parseInt(opts.employeesMax, 10);
+  if (opts.employeesMin) args.employeeRangeMinimum = parseInteger(opts.employeesMin, '--employees-min');
+  if (opts.employeesMax) args.employeeRangeMaximum = parseInteger(opts.employeesMax, '--employees-max');
   if (opts.revenue) args.revenue = opts.revenue;
-  if (opts.revenueMin) args.revenueMin = parseInt(opts.revenueMin, 10);
-  if (opts.revenueMax) args.revenueMax = parseInt(opts.revenueMax, 10);
+  if (opts.revenueMin) args.revenueMin = parseInteger(opts.revenueMin, '--revenue-min');
+  if (opts.revenueMax) args.revenueMax = parseInteger(opts.revenueMax, '--revenue-max');
   if (opts.type) args.companyTypeList = splitList(opts.type);
   if (opts.ticker) args.companyTickerList = opts.ticker;
   if (opts.tech) args.techAttributeTagIdList = splitList(opts.tech);
@@ -91,8 +91,8 @@ export function buildCompaniesSearchArgs(opts: CompaniesSearchOptions): Record<s
   if (opts.recentFundingRound) args.recentFundingRoundTypes = splitList(opts.recentFundingRound);
   if (opts.anyFundingRound) args.allFundingRoundTypes = splitList(opts.anyFundingRound);
   if (opts.sort) args.sort = opts.sort;
-  if (opts.page) args.page = parseInt(opts.page, 10);
-  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+  if (opts.page) args.page = parseInteger(opts.page, '--page');
+  if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
 
   return args;
 }
@@ -137,19 +137,13 @@ export function buildCompaniesSimilarArgs(opts: CompaniesSimilarOptions): Record
 
   const args: Record<string, unknown> = {};
 
-  if (opts.id) {
-    const n = Number(opts.id);
-    if (!Number.isInteger(n) || n === 0) {
-      throw new Error(`--id must be an integer ZoomInfo company ID (got "${opts.id}")`);
-    }
-    args.zoominfoCompanyId = n;
-  }
+  if (opts.id) args.zoominfoCompanyId = parseId(opts.id, '--id');
   if (opts.name) args.companyName = opts.name;
   if (opts.sameIndustry) args.sameIndustry = true;
   if (opts.sameCountry) args.sameCountry = true;
   if (opts.sameRevenueRange) args.sameRevenueRange = true;
   if (opts.sameEmployeeRange) args.sameEmployeeRange = true;
-  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+  if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
 
   return args;
 }

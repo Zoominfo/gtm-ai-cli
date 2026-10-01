@@ -34,6 +34,25 @@ export function parsePageOptions(opts: PageOptionInput): PageOptions {
   return { page, per_page };
 }
 
+// Strict integer flag parsing: rejects values like "5k" or "1.5" that parseInt would
+// silently truncate, so a typo fails fast instead of reaching the MCP as the wrong number.
+export function parseInteger(value: string, flag: string): number {
+  const n = Number(value);
+  if (value.trim() === '' || !Number.isInteger(n)) {
+    throw new Error(`${flag} must be an integer (got "${value}")`);
+  }
+  return n;
+}
+
+// ZoomInfo IDs are non-zero integers; some (e.g. contact IDs) are negative.
+export function parseId(value: string, flag: string): number {
+  const n = Number(value);
+  if (value.trim() === '' || !Number.isInteger(n) || n === 0) {
+    throw new Error(`${flag} must be an integer ZoomInfo ID (got "${value}")`);
+  }
+  return n;
+}
+
 export function parseRange(input: string): { min: string; max: string } {
   const [min, max] = input.split(',');
   return { min: min ?? '', max: max ?? '' };

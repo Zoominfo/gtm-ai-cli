@@ -2,7 +2,7 @@ import type { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters, splitList, normalizeEnrichEntries } from '../utils.js';
+import { requireSearchFilters, splitList, normalizeEnrichEntries, parseInteger, parseId } from '../utils.js';
 
 interface ContactsSearchOptions {
   firstName?: string;
@@ -87,7 +87,7 @@ export function buildContactsSearchArgs(opts: ContactsSearchOptions): Record<str
   if (opts.managementLevel) args.managementLevelList = splitList(opts.managementLevel);
   if (opts.department) args.departmentList = splitList(opts.department);
   if (opts.jobFunction) args.jobFunctionList = splitList(opts.jobFunction);
-  if (opts.companyId) args.companyIdList = splitList(opts.companyId).map((id) => parseInt(id, 10));
+  if (opts.companyId) args.companyIdList = splitList(opts.companyId).map((id) => parseId(id, '--company-id'));
   if (opts.companyName) args.companyName = opts.companyName;
   if (opts.companyDomain) args.companyWebsite = opts.companyDomain;
   if (opts.industry) args.industryList = splitList(opts.industry);
@@ -98,18 +98,18 @@ export function buildContactsSearchArgs(opts: ContactsSearchOptions): Record<str
   if (opts.zipRadius) args.zipCodeRadiusMiles = opts.zipRadius;
   if (opts.locationType) args.locationSearchType = opts.locationType;
   if (opts.employees) args.employeeCount = opts.employees;
-  if (opts.employeesMin) args.employeeRangeMinimum = parseInt(opts.employeesMin, 10);
-  if (opts.employeesMax) args.employeeRangeMaximum = parseInt(opts.employeesMax, 10);
+  if (opts.employeesMin) args.employeeRangeMinimum = parseInteger(opts.employeesMin, '--employees-min');
+  if (opts.employeesMax) args.employeeRangeMaximum = parseInteger(opts.employeesMax, '--employees-max');
   if (opts.revenue) args.revenue = opts.revenue;
-  if (opts.revenueMin) args.revenueMin = parseInt(opts.revenueMin, 10);
-  if (opts.revenueMax) args.revenueMax = parseInt(opts.revenueMax, 10);
+  if (opts.revenueMin) args.revenueMin = parseInteger(opts.revenueMin, '--revenue-min');
+  if (opts.revenueMax) args.revenueMax = parseInteger(opts.revenueMax, '--revenue-max');
   if (opts.tech) args.techAttributeTagIdList = splitList(opts.tech);
-  if (opts.accuracyMin) args.contactAccuracyScoreMinimum = parseInt(opts.accuracyMin, 10);
-  if (opts.accuracyMax) args.contactAccuracyScoreMaximum = parseInt(opts.accuracyMax, 10);
+  if (opts.accuracyMin) args.contactAccuracyScoreMinimum = parseInteger(opts.accuracyMin, '--accuracy-min');
+  if (opts.accuracyMax) args.contactAccuracyScoreMaximum = parseInteger(opts.accuracyMax, '--accuracy-max');
   if (opts.required) args.requiredFieldsList = splitList(opts.required);
   if (opts.sort) args.sort = opts.sort;
-  if (opts.page) args.page = parseInt(opts.page, 10);
-  if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+  if (opts.page) args.page = parseInteger(opts.page, '--page');
+  if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
 
   return args;
 }
@@ -262,10 +262,10 @@ export function registerContacts(program: Command): void {
     .option(...SELECT_OPTION)
     .action(async (opts: ContactsSimilarOptions) => {
       const args: Record<string, unknown> = {
-        referencePersonId: parseInt(opts.personId, 10),
+        referencePersonId: parseId(opts.personId, '--person-id'),
       };
-      if (opts.companyId) args.targetCompanyId = parseInt(opts.companyId, 10);
-      if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+      if (opts.companyId) args.targetCompanyId = parseId(opts.companyId, '--company-id');
+      if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
       const data = await mcpCall('find_similar_contacts', args);
       print(data, opts.format, opts.select);
     });
@@ -280,10 +280,10 @@ export function registerContacts(program: Command): void {
     .option(...SELECT_OPTION)
     .action(async (opts: ContactsRecommendedOptions) => {
       const args: Record<string, unknown> = {
-        ziCompanyId: parseInt(opts.companyId, 10),
+        ziCompanyId: parseId(opts.companyId, '--company-id'),
         useCaseType: opts.useCase,
       };
-      if (opts.pageSize) args.pageSize = parseInt(opts.pageSize, 10);
+      if (opts.pageSize) args.pageSize = parseInteger(opts.pageSize, '--page-size');
       const data = await mcpCall('get_recommended_contacts', args);
       print(data, opts.format, opts.select);
     });

@@ -87,7 +87,7 @@ gtm auth login
 
 ## Output formats
 
-Every subcommand accepts `-f, --format`. The `table` and `csv` formats auto-flatten JSON:API envelopes (`data: [...]`) and one-level-nested objects (`company.id`, `company.name`); `json`, `jsonl`, and `yaml` preserve the exact response shape.
+Every subcommand accepts `-f, --format`. The `table` and `csv` formats auto-flatten JSON:API envelopes (`data: [...]`) and one-level-nested objects (`company.id`, `company.name`); `jsonl` emits each record of a list response on its own line; `json` and `yaml` preserve the exact response shape.
 
 | Format | When to use |
 |---|---|
