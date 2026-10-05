@@ -93,7 +93,7 @@ Every subcommand accepts `-f, --format`. The `table` and `csv` formats auto-flat
 |---|---|
 | `json` (default) | Pretty-printed JSON. Pipe to `jq` for field extraction. |
 | `jsonl` | One JSON object per line. Stream into log/data pipelines. |
-| `csv` | Flat CSV with headers; nested objects are dot-flattened, arrays are stringified. |
+| `csv` | Flat CSV with headers; nested objects are dot-flattened, arrays are stringified. Text cells that a spreadsheet would run as a formula (leading `=`, `+`, `-`, `@`) are prefixed with `'`. |
 | `yaml` | Human-readable diffs of deeply nested responses. |
 | `table` | ASCII bordered table. Best for terminal browsing of small responses. |
 
