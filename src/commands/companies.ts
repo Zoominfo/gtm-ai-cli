@@ -206,7 +206,7 @@ export function registerCompanies(program: Command): void {
     .option('--ticker <symbol>', 'Stock ticker symbol')
     .option('--ip <address>', 'IP address')
     .option('--file <path>', 'JSON file with an array of identifier objects (up to 10)')
-    .option('--fields <fields...>', 'Specific fields to return (see --help for valid values)')
+    .option('--fields <fields...>', 'Fields to return, space- or comma-separated (e.g. name website revenue); an invalid name is rejected with the list of valid ones')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: CompaniesEnrichOptions) => {
@@ -238,7 +238,7 @@ export function registerCompanies(program: Command): void {
       }
 
       const args: Record<string, unknown> = { companies: companiesArr };
-      if (opts.fields && opts.fields.length > 0) args.requiredFields = opts.fields;
+      if (opts.fields && opts.fields.length > 0) args.requiredFields = opts.fields.flatMap(splitList);
 
       const data = await mcpCall('enrich_companies', args);
       print(data, opts.format, opts.select);

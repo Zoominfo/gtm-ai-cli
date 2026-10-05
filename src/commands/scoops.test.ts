@@ -13,6 +13,10 @@ describe('buildScoopsSearchArgs', () => {
     expect(args.metroRegions).toEqual(['usa.newyork.newyork', 'usa.california.losangeles']);
   });
 
+  it('lowercases the revenue range, which search_scoops requires', () => {
+    expect(buildScoopsSearchArgs({ revenue: '1Mto5M' }).revenue).toBe('1mto5m');
+  });
+
   it('passes job titles verbatim, since a title can contain a comma', () => {
     expect(buildScoopsSearchArgs({ jobTitle: ['VP, Sales'] }).jobTitle).toEqual(['VP, Sales']);
   });

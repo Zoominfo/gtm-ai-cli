@@ -214,7 +214,7 @@ export function registerContacts(program: Command): void {
     .option('--company-id <id>', 'Company ID (used with first/last/full name)')
     .option('--job-title <title>')
     .option('--file <path>', 'JSON file with an array of identifier objects (up to 10)')
-    .option('--fields <fields...>', 'Specific fields to return')
+    .option('--fields <fields...>', 'Fields to return, space- or comma-separated (e.g. name website revenue); an invalid name is rejected with the list of valid ones')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: ContactsEnrichOptions) => {
@@ -246,7 +246,7 @@ export function registerContacts(program: Command): void {
       }
 
       const args: Record<string, unknown> = { contacts: contactsArr };
-      if (opts.fields && opts.fields.length > 0) args.requiredFields = opts.fields;
+      if (opts.fields && opts.fields.length > 0) args.requiredFields = opts.fields.flatMap(splitList);
 
       const data = await mcpCall('enrich_contacts', args);
       print(data, opts.format, opts.select);
