@@ -24,10 +24,13 @@ export function registerAuth(program: Command): void {
     .command('logout')
     .description('Revoke the current token and remove saved credentials')
     .action(async () => {
-      let creds: Credentials | null = null;
-      try { creds = loadCredentials(); } catch { /* unreadable file — still clear it below */ }
+      const creds = loadCredentials();
       if (creds) {
-        try { await revokeToken(creds.access_token, creds.client_id); } catch { /* best effort */ }
+        // Best effort: revoke the refresh token too, so the session can't be renewed.
+        await Promise.allSettled([
+          revokeToken(creds.refresh_token, creds.client_id, 'refresh_token'),
+          revokeToken(creds.access_token, creds.client_id, 'access_token'),
+        ]);
       }
       clearCredentials();
       console.log('Logged out.');
