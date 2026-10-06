@@ -5,6 +5,7 @@ import { refreshAccessToken } from './oauth.js';
 import type { Credentials, OAuthTokenResponse } from './types.js';
 
 const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+
 const GTM_CONFIG_DIR = join(homedir(), '.config', 'gtm-ai');
 const CREDENTIALS_PATH = join(GTM_CONFIG_DIR, 'credentials');
 const CLIENT_ID_PATH = join(GTM_CONFIG_DIR, 'client_id');
@@ -99,6 +100,28 @@ export async function refreshCredentials(creds: Credentials): Promise<Credential
     const latest = loadCredentials();
     if (latest && latest.refresh_token !== creds.refresh_token && !isExpired(latest)) return latest;
     throw new Error(`Could not refresh your session (${(err as Error).message}). Run: gtm auth login`);
+  }
+}
+
+// Thrown by a request passed to withSession when the server rejects its token.
+export class SessionRejected extends Error {}
+
+// Run a request with the saved session. If the server rejects the token before its recorded
+// expiry (e.g. it was revoked), refresh once and retry; a second rejection means logging in again.
+export async function withSession<T>(request: (creds: Credentials) => Promise<T>): Promise<T> {
+  const creds = await getValidCredentials();
+  if (!creds) throw new Error('Not logged in. Run: gtm auth login');
+  try {
+    return await request(creds);
+  } catch (err) {
+    if (!(err instanceof SessionRejected)) throw err;
+  }
+
+  const refreshed = await refreshCredentials(loadCredentials() ?? creds);
+  try {
+    return await request(refreshed);
+  } catch (err) {
+    throw err instanceof SessionRejected ? new Error('Your session is no longer valid. Run: gtm auth login') : err;
   }
 }
 

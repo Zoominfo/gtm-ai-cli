@@ -70,6 +70,6 @@ program.addCommand(
 process.on('beforeExit', () => { void closeClient(); });
 
 program.parseAsync().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
+  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });
