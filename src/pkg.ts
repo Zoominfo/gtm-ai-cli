@@ -6,3 +6,5 @@ export interface Pkg {
 }
 
 export const pkg: Pkg = { name: packageJson.name, version: packageJson.version };
+
+export const USER_AGENT = `gtm-ai-cli/${pkg.version}`;

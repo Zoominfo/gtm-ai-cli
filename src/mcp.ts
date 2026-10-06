@@ -1,8 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getValidCredentials, loadCredentials, refreshCredentials } from './credentials.js';
+import { SessionRejected, withSession } from './credentials.js';
 import { debugLog } from './debug.js';
-import { pkg } from './pkg.js';
+import { pkg, USER_AGENT } from './pkg.js';
 import type { Credentials } from './types.js';
 
 // TODO(phase-1-discovery): confirm the MCP endpoint URL.
@@ -12,8 +12,6 @@ const MCP_URL = new URL('https://mcp.zoominfo.com/mcp');
 // the SDK's 60s default when the server is busy.
 const TOOL_CALL_TIMEOUT_MS = 5 * 60 * 1000;
 
-const NOT_LOGGED_IN = 'Not logged in. Run: gtm auth login';
-
 let cached: Client | null = null;
 
 async function connect(creds: Credentials): Promise<Client> {
@@ -21,7 +19,7 @@ async function connect(creds: Credentials): Promise<Client> {
     requestInit: {
       headers: {
         Authorization: `Bearer ${creds.access_token}`,
-        'User-Agent': `gtm-ai-cli/${pkg.version}`,
+        'User-Agent': USER_AGENT,
       },
     },
   });
@@ -34,11 +32,8 @@ async function connect(creds: Credentials): Promise<Client> {
   return client;
 }
 
-async function getClient(): Promise<Client> {
-  if (cached) return cached;
-  const creds = await getValidCredentials();
-  if (!creds) throw new Error(NOT_LOGGED_IN);
-  cached = await connect(creds);
+async function getClient(creds: Credentials): Promise<Client> {
+  if (!cached) cached = await connect(creds);
   return cached;
 }
 
@@ -46,26 +41,18 @@ function isUnauthorized(err: unknown): boolean {
   return err instanceof StreamableHTTPError && err.code === 401;
 }
 
-// Run an MCP request, refreshing the session once if the server rejects the token
-// before its recorded expiry (e.g. it was revoked or rotated elsewhere).
-async function withSession<T>(request: (client: Client) => Promise<T>): Promise<T> {
-  try {
-    return await request(await getClient());
-  } catch (err) {
-    if (!isUnauthorized(err)) throw err;
-  }
-
-  await closeClient();
-  const creds = loadCredentials();
-  if (!creds) throw new Error(NOT_LOGGED_IN);
-  const refreshed = await refreshCredentials(creds);
-  try {
-    cached = await connect(refreshed);
-    return await request(cached);
-  } catch (err) {
-    if (isUnauthorized(err)) throw new Error('Your session is no longer valid. Run: gtm auth login');
-    throw err;
-  }
+// Run an MCP request with the shared session handling. A client whose token was rejected is
+// dropped, so the retry reconnects with the refreshed token.
+function withClient<T>(request: (client: Client) => Promise<T>): Promise<T> {
+  return withSession(async creds => {
+    try {
+      return await request(await getClient(creds));
+    } catch (err) {
+      if (!isUnauthorized(err)) throw err;
+      await closeClient();
+      throw new SessionRejected();
+    }
+  });
 }
 
 interface McpToolContent {
@@ -180,7 +167,7 @@ function friendlyError(raw: string): string {
 
 export async function mcpCall<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T> {
   debugLog(`call ${name}`, args);
-  const res = await withSession(client =>
+  const res = await withClient(client =>
     client.callTool({ name, arguments: args }, undefined, { timeout: TOOL_CALL_TIMEOUT_MS }),
   ) as McpToolResult;
   debugLog(`response ${name}`, res);
@@ -205,7 +192,7 @@ export interface McpTool {
 }
 
 export async function listMcpTools(): Promise<McpTool[]> {
-  const res = await withSession(client => client.listTools());
+  const res = await withClient(client => client.listTools());
   return res.tools as McpTool[];
 }
 

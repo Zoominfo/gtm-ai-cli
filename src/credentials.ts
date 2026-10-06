@@ -102,6 +102,28 @@ export async function refreshCredentials(creds: Credentials): Promise<Credential
   }
 }
 
+// Thrown by a request passed to withSession when the server rejects its token.
+export class SessionRejected extends Error {}
+
+// Run a request with the saved session. If the server rejects the token before its recorded
+// expiry (e.g. it was revoked), refresh once and retry; a second rejection means logging in again.
+export async function withSession<T>(request: (creds: Credentials) => Promise<T>): Promise<T> {
+  const creds = await getValidCredentials();
+  if (!creds) throw new Error('Not logged in. Run: gtm auth login');
+  try {
+    return await request(creds);
+  } catch (err) {
+    if (!(err instanceof SessionRejected)) throw err;
+  }
+
+  const refreshed = await refreshCredentials(loadCredentials() ?? creds);
+  try {
+    return await request(refreshed);
+  } catch (err) {
+    throw err instanceof SessionRejected ? new Error('Your session is no longer valid. Run: gtm auth login') : err;
+  }
+}
+
 export function clearCredentials(): void {
   if (existsSync(CREDENTIALS_PATH)) unlinkSync(CREDENTIALS_PATH);
 }
