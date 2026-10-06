@@ -1,8 +1,7 @@
 import type { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters, splitList, normalizeEnrichEntries, parseInteger, parseId } from '../utils.js';
+import { requireSearchFilters, splitList, normalizeEnrichEntries, parseInteger, parseId, readJsonArray } from '../utils.js';
 
 interface CompaniesSearchOptions {
   name?: string;
@@ -213,15 +212,7 @@ export function registerCompanies(program: Command): void {
       let companiesArr: unknown[];
 
       if (opts.file) {
-        const text = await readFile(opts.file, 'utf8');
-        const parsed: unknown = JSON.parse(text);
-        const arr = Array.isArray(parsed)
-          ? parsed
-          : (parsed as { companies?: unknown }).companies;
-        if (!Array.isArray(arr)) {
-          console.error('Error: --file must contain a JSON array of company identifier objects (or { "companies": [...] })');
-          process.exit(1);
-        }
+        const arr = await readJsonArray(opts.file, 'companies');
         try {
           companiesArr = normalizeCompaniesEnrichEntries(arr);
         } catch (err) {

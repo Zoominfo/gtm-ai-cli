@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { getValidCredentials, loadCredentials, refreshCredentials } from './credentials.js';
+import { debugLog } from './debug.js';
 import { pkg } from './pkg.js';
 import type { Credentials } from './types.js';
 
@@ -175,17 +176,6 @@ function friendlyError(raw: string): string {
 
   const head = `Error: ${stripped || 'unknown error'}`;
   return hints.length ? `${head}\n  → ${hints.join('\n  → ')}` : head;
-}
-
-function debugEnabled(): boolean {
-  return process.env.GTM_DEBUG === '1';
-}
-
-function debugLog(label: string, payload: unknown): void {
-  if (!debugEnabled()) return;
-  const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const truncated = body.length > 2000 ? `${body.slice(0, 2000)}… (${body.length} chars total)` : body;
-  console.error(`[gtm-debug] ${label}: ${truncated}`);
 }
 
 export async function mcpCall<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T> {
