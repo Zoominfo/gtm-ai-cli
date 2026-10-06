@@ -1,12 +1,12 @@
 ---
 name: gtm-ai-cli
-description: This skill should be used when searching for or enriching companies and contacts, surfacing buyer intent signals, fetching real-time business events (scoops) or company news, browsing engagement history (meetings, emails) or asking conversation-intelligence questions, reading or updating GTM context (offerings, ICPs, personas, competitors), looking up reference values (industries, metros, intent topics, tech products), or doing any ZoomInfo / GTM data lookup from the terminal. Activates when the user asks to "find companies", "search contacts", "enrich a contact", "find lookalike companies", "research a company / person", "get intent signals", "find scoops", "fetch company news", "what's happening at this account", "what did they say on the call", "show our GTM context", "look up industry codes", or any task involving ZoomInfo data lookup from the terminal.
-version: 0.2.0
+description: This skill should be used when searching for or enriching companies and contacts, surfacing buyer intent signals, fetching real-time business events (scoops) or company news, browsing engagement history (meetings, emails) or asking conversation-intelligence questions, reading or updating GTM context (offerings, ICPs, personas, competitors), looking up reference values (industries, metros, intent topics, tech products), cleaning, segmenting, or scoring the user's own records with Data Quality, sending records to a connected system with exports, or doing any ZoomInfo / GTM data lookup from the terminal. Activates when the user asks to "find companies", "search contacts", "enrich a contact", "find lookalike companies", "research a company / person", "get intent signals", "find scoops", "fetch company news", "what's happening at this account", "what did they say on the call", "show our GTM context", "look up industry codes", "clean / normalize these emails or phone numbers", "score / segment these leads", "export these accounts to our CRM", or any task involving ZoomInfo data lookup from the terminal.
+version: 0.3.0
 ---
 
 # GTM AI CLI Skill
 
-Use the `gtm` CLI to drive ZoomInfo's GTM AI MCP from the terminal: search and enrich companies and contacts, surface intent signals, find real-time business events (scoops), pull per-company signals (intent + news + scoops), browse engagements and ask conversation-intelligence questions, read/update your organization's GTM context, and look up reference values. Output defaults to JSON for `jq` piping; use `-f, --format` to switch to `jsonl`, `csv`, `yaml`, or `table`.
+Use the `gtm` CLI to drive ZoomInfo's GTM AI MCP from the terminal: search and enrich companies and contacts, surface intent signals, find real-time business events (scoops), pull per-company signals (intent + news + scoops), browse engagements and ask conversation-intelligence questions, read/update your organization's GTM context, look up reference values, clean, segment, and score your own records (Data Quality), and send records to connected systems (exports). Output defaults to JSON for `jq` piping; use `-f, --format` to switch to `jsonl`, `csv`, `yaml`, or `table`.
 
 ## Authentication
 
@@ -258,6 +258,32 @@ gtm audiences analyze --id <audienceId> --query "Summarize this audience and sho
 `--search-query` takes the exact params of the matching search (`search_companies` for `COMPANY`, `search_contacts` for `CONTACT`) as a JSON object — the `gtm companies/contacts search --debug` output shows them. Include it only when the audience is sourced from a ZoomInfo search; `page`, `pageSize`, and `sort` are dropped. `analyze` answers counts, distributions, rankings, segments, and comparisons in one call — put every metric you need in a single `--query`, quoting exact column names.
 
 When creating an audience from ZoomInfo search criteria, pass the exact search input params as JSON via `--search-query` (company filters for `--type COMPANY`, contact filters for `--type CONTACT`).
+
+### Data Quality — prepare, segment, and score the user's own records
+
+Data Quality (beta) cleans records the user brings (emails, phones, addresses, job titles, person names), sorts them into segments, and scores them, returning results inline. Default prepare steps are free; `--line-type`, `--verify`, `--config-id` / `--rules`, `score`, and `segment` use credits, so confirm with the user before running those on more than a handful of records. Limits per call: 30 values for `prepare`, 25 records and 10 configs for `score` / `segment`. Address `prepare` needs `--verify` or custom normalization.
+
+```bash
+gtm dq prepare email " Jane.Doe@Example.COM " --select input.email,value.fullEmail,isValid   # free
+gtm dq prepare phone --file ./phones.json --line-type                 # JSON array of strings or component objects
+gtm dq prepare phone "617.555.0123" --rules ./rules.json              # { "phone": [{ "type": "INT_FORMAT", "value": "E164" }] }
+gtm dq configs list score                                             # kinds: normalize | score | segment
+gtm dq score --config-ids <configId> --file ./leads.json              # records keyed by the fields the config uses
+gtm dq segment --config-ids <configId> --file ./leads.json
+gtm dq configs create segment --file ./territories.json               # file = the config's attributes
+```
+
+`prepare` results are positional (`data[i]` is value `i`; failures are `PrepareError` resources in place). Validation is structural only: `isValid` does not mean an email won't bounce. Config IDs come from `configs list`; never guess them. When updating a score or segment config, send the complete config (fetch it with `configs get`, edit, then `configs update`) — omitted elements or segments may not be preserved.
+
+### Exports — send records to connected systems
+
+`exports run` writes records to the user's connected system (e.g. their CRM), so confirm the export and the records with the user before running it. IDs come from searches; up to 50 per run.
+
+```bash
+gtm exports list -f table                                             # id, name, category
+gtm exports run --id <exportId> --company-ids 344589814 --wait        # or --contact-ids; --wait polls to completion
+gtm exports status --id <runId>                                       # PENDING | IN_PROGRESS | COMPLETED | FAILED | STOPPED
+```
 
 ### Raw — universal escape hatch
 
