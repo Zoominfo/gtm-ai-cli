@@ -24,6 +24,12 @@ export const SELECT_OPTION = [
   'Comma-separated dotted paths to project from each record (e.g. id,name,company.id)',
 ] as const satisfies readonly [string, string];
 
+// The options added by FORMAT_OPTION and SELECT_OPTION.
+export interface OutputOptions {
+  format?: string;
+  select?: string;
+}
+
 type Row = Record<string, unknown>;
 
 function toRows(data: unknown): Row[] {
