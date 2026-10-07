@@ -1,8 +1,7 @@
 import type { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { requireSearchFilters, splitList, normalizeEnrichEntries, parseInteger, parseId } from '../utils.js';
+import { requireSearchFilters, splitList, normalizeEnrichEntries, parseInteger, parseId, readJsonArray } from '../utils.js';
 
 interface ContactsSearchOptions {
   firstName?: string;
@@ -214,22 +213,14 @@ export function registerContacts(program: Command): void {
     .option('--company-id <id>', 'Company ID (used with first/last/full name)')
     .option('--job-title <title>')
     .option('--file <path>', 'JSON file with an array of identifier objects (up to 10)')
-    .option('--fields <fields...>', 'Specific fields to return')
+    .option('--fields <fields...>', 'Fields to return, space- or comma-separated (e.g. name website revenue); an invalid name is rejected with the list of valid ones')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: ContactsEnrichOptions) => {
       let contactsArr: unknown[];
 
       if (opts.file) {
-        const text = await readFile(opts.file, 'utf8');
-        const parsed: unknown = JSON.parse(text);
-        const arr = Array.isArray(parsed)
-          ? parsed
-          : (parsed as { contacts?: unknown }).contacts;
-        if (!Array.isArray(arr)) {
-          console.error('Error: --file must contain a JSON array of contact identifier objects (or { "contacts": [...] })');
-          process.exit(1);
-        }
+        const arr = await readJsonArray(opts.file, 'contacts');
         try {
           contactsArr = normalizeContactsEnrichEntries(arr);
         } catch (err) {
@@ -246,7 +237,7 @@ export function registerContacts(program: Command): void {
       }
 
       const args: Record<string, unknown> = { contacts: contactsArr };
-      if (opts.fields && opts.fields.length > 0) args.requiredFields = opts.fields;
+      if (opts.fields && opts.fields.length > 0) args.requiredFields = opts.fields.flatMap(splitList);
 
       const data = await mcpCall('enrich_contacts', args);
       print(data, opts.format, opts.select);

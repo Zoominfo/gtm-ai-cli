@@ -1,31 +1,25 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getValidCredentials } from './credentials.js';
-import { pkg } from './pkg.js';
+import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { SessionRejected, withSession } from './credentials.js';
+import { debugLog } from './debug.js';
+import { pkg, USER_AGENT } from './pkg.js';
+import type { Credentials } from './types.js';
 
 // TODO(phase-1-discovery): confirm the MCP endpoint URL.
 const MCP_URL = new URL('https://mcp.zoominfo.com/mcp');
 
+// Agentic tools (research, conversation intelligence, audience analysis) can run well past
+// the SDK's 60s default when the server is busy.
+const TOOL_CALL_TIMEOUT_MS = 5 * 60 * 1000;
+
 let cached: Client | null = null;
 
-async function getClient(): Promise<Client> {
-  if (cached) return cached;
-
-  const creds = await getValidCredentials();
-  if (!creds) {
-    console.error('Not logged in. Run: gtm auth login');
-    process.exit(1);
-  }
-  if (creds.expires_at !== null && Date.now() >= creds.expires_at) {
-    console.error('Session expired. Run: gtm auth login');
-    process.exit(1);
-  }
-
+async function connect(creds: Credentials): Promise<Client> {
   const transport = new StreamableHTTPClientTransport(MCP_URL, {
     requestInit: {
       headers: {
         Authorization: `Bearer ${creds.access_token}`,
-        'User-Agent': `gtm-ai-cli/${pkg.version}`,
+        'User-Agent': USER_AGENT,
       },
     },
   });
@@ -35,8 +29,30 @@ async function getClient(): Promise<Client> {
     { capabilities: {} },
   );
   await client.connect(transport);
-  cached = client;
   return client;
+}
+
+async function getClient(creds: Credentials): Promise<Client> {
+  if (!cached) cached = await connect(creds);
+  return cached;
+}
+
+function isUnauthorized(err: unknown): boolean {
+  return err instanceof StreamableHTTPError && err.code === 401;
+}
+
+// Run an MCP request with the shared session handling. A client whose token was rejected is
+// dropped, so the retry reconnects with the refreshed token.
+function withClient<T>(request: (client: Client) => Promise<T>): Promise<T> {
+  return withSession(async creds => {
+    try {
+      return await request(await getClient(creds));
+    } catch (err) {
+      if (!isUnauthorized(err)) throw err;
+      await closeClient();
+      throw new SessionRejected();
+    }
+  });
 }
 
 interface McpToolContent {
@@ -149,21 +165,11 @@ function friendlyError(raw: string): string {
   return hints.length ? `${head}\n  → ${hints.join('\n  → ')}` : head;
 }
 
-function debugEnabled(): boolean {
-  return process.env.GTM_DEBUG === '1';
-}
-
-function debugLog(label: string, payload: unknown): void {
-  if (!debugEnabled()) return;
-  const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const truncated = body.length > 2000 ? `${body.slice(0, 2000)}… (${body.length} chars total)` : body;
-  console.error(`[gtm-debug] ${label}: ${truncated}`);
-}
-
 export async function mcpCall<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T> {
   debugLog(`call ${name}`, args);
-  const client = await getClient();
-  const res = await client.callTool({ name, arguments: args }) as McpToolResult;
+  const res = await withClient(client =>
+    client.callTool({ name, arguments: args }, undefined, { timeout: TOOL_CALL_TIMEOUT_MS }),
+  ) as McpToolResult;
   debugLog(`response ${name}`, res);
 
   if (res.isError) {
@@ -186,8 +192,7 @@ export interface McpTool {
 }
 
 export async function listMcpTools(): Promise<McpTool[]> {
-  const client = await getClient();
-  const res = await client.listTools();
+  const res = await withClient(client => client.listTools());
   return res.tools as McpTool[];
 }
 

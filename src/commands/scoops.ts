@@ -55,7 +55,8 @@ export function buildScoopsSearchArgs(opts: ScoopsSearchOptions): Record<string,
   if (opts.zipRadius) args.zipCodeRadiusMiles = opts.zipRadius;
   if (opts.locationType) args.locationSearchType = opts.locationType;
   if (opts.employees) args.employeeCount = list(opts.employees);
-  if (opts.revenue) args.revenue = opts.revenue;
+  // search_scoops only accepts lowercase ranges (1mto5m), unlike the company/contact searches.
+  if (opts.revenue) args.revenue = opts.revenue.toLowerCase();
   if (opts.managementLevel) args.managementLevels = list(opts.managementLevel);
   if (opts.jobTitle) args.jobTitle = opts.jobTitle;
   if (opts.sort) args.sort = opts.sort;
@@ -87,7 +88,7 @@ export function registerScoops(program: Command): void {
     .option('--zip-radius <miles>', 'Radius in miles around --zip: 10 | 25 | 50 | 100 | 250')
     .option('--location-type <type>', 'What the location filters apply to: Person | HQ | PersonOrHQ | PersonAndHQ | PersonThenHQ. Requires at least one location filter')
     .option('--employees <ranges...>', 'Employee count ranges')
-    .option('--revenue <range>', 'Revenue range')
+    .option('--revenue <range>', 'Revenue range: under500k | 500kto1m | 1mto5m | 5mto10m | 10mto25m | … (case-insensitive)')
     .option('--management-level <levels...>', 'Management levels to include')
     .option('--job-title <titles...>', 'Contact job titles')
     .option('--sort <field>', 'Default: -originalPublishedDate')

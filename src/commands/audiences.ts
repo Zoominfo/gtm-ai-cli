@@ -1,8 +1,7 @@
 import type { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { parseInteger } from '../utils.js';
+import { parseInteger, readJsonArray } from '../utils.js';
 
 // GTM Studio audiences. The write tools (create/update/columns/rows) drive a downstream
 // AI agent via an agentInstruction, so those commands require --instruction — a complete,
@@ -85,12 +84,19 @@ export function buildAudiencesListArgs(opts: AudiencesListOptions): Record<strin
 
 export function buildAudiencesGetArgs(opts: AudiencesGetOptions): Record<string, unknown> {
   const args: Record<string, unknown> = { audienceId: opts.id };
-  if (opts.preview !== undefined) {
+  // --preview-columns and --row-filter only apply to a preview, so either one implies it.
+  if (opts.preview !== undefined || opts.previewColumns?.length || opts.rowFilter) {
     args.previewRows = true;
     // --preview with a value sets the row limit; bare --preview uses the server default (5).
     if (typeof opts.preview === 'string') args.previewRowLimit = parseInteger(opts.preview, '--preview');
     if (opts.previewColumns && opts.previewColumns.length > 0) args.previewColumnIds = opts.previewColumns;
-    if (opts.rowFilter) args.rowFilter = JSON.parse(opts.rowFilter);
+    if (opts.rowFilter) {
+      try {
+        args.rowFilter = JSON.parse(opts.rowFilter);
+      } catch {
+        throw new Error('--row-filter must be valid JSON');
+      }
+    }
   }
   return args;
 }
@@ -139,20 +145,6 @@ export function buildAudiencesAnalyzeArgs(opts: AudiencesAnalyzeOptions): Record
   return { audienceId: opts.id, query: opts.query };
 }
 
-// Reads a JSON file containing an array, optionally wrapped in { "<key>": [...] }.
-async function readJsonArray(path: string, key: string): Promise<unknown[]> {
-  const text = await readFile(path, 'utf8');
-  const parsed: unknown = JSON.parse(text);
-  const arr = Array.isArray(parsed)
-    ? parsed
-    : (parsed as Record<string, unknown>)[key];
-  if (!Array.isArray(arr)) {
-    console.error(`Error: --file must contain a JSON array of ${key} (or { "${key}": [...] })`);
-    process.exit(1);
-  }
-  return arr;
-}
-
 export function registerAudiences(program: Command): void {
   const audiences = program.command('audiences').description('GTM Studio audiences — list-building workbooks of contacts or companies');
 
@@ -176,8 +168,8 @@ export function registerAudiences(program: Command): void {
     .description('Fetch an audience: column definitions plus an optional row preview')
     .requiredOption('--id <uuid>', 'Audience ID from `gtm audiences list`')
     .option('--preview [n]', 'Include a row preview; optionally set the row count (max 25, default 5)')
-    .option('--preview-columns <ids...>', 'Column IDs to include in the preview (default: all)')
-    .option('--row-filter <json>', 'Row filter JSON, e.g. \'{"operator":"AND","filters":[{"columnId":"…","filterOperator":"CONTAINS","values":["…"]}]}\' (requires --preview)')
+    .option('--preview-columns <ids...>', 'Column IDs to include in the preview (default: all; implies --preview)')
+    .option('--row-filter <json>', 'Row filter JSON, e.g. \'{"operator":"AND","filters":[{"columnId":"…","filterOperator":"CONTAINS","values":["…"]}]}\' (implies --preview)')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: AudiencesGetOptions) => {

@@ -2,7 +2,8 @@
 
 A command-line interface for searching [ZoomInfo](https://www.zoominfo.com/) go-to-market (GTM) data. 
 Search and enrich companies and contacts, surface intent / news / scoop signals, browse engagement history, 
-manage GTM context, and pipe results through your shell as JSON, JSONL, CSV, YAML, or a table.
+manage GTM context, clean and score your own records, send records to connected systems, and pipe
+results through your shell as JSON, JSONL, CSV, YAML, or a table.
 
 ## Installation
 
@@ -93,7 +94,7 @@ Every subcommand accepts `-f, --format`. The `table` and `csv` formats auto-flat
 |---|---|
 | `json` (default) | Pretty-printed JSON. Pipe to `jq` for field extraction. |
 | `jsonl` | One JSON object per line. Stream into log/data pipelines. |
-| `csv` | Flat CSV with headers; nested objects are dot-flattened, arrays are stringified. |
+| `csv` | Flat CSV with headers; nested objects are dot-flattened, arrays are stringified. Text cells that a spreadsheet would run as a formula (leading `=`, `+`, `-`, `@`) are prefixed with `'`. |
 | `yaml` | Human-readable diffs of deeply nested responses. |
 | `table` | ASCII bordered table. Best for terminal browsing of small responses. |
 
@@ -467,6 +468,69 @@ gtm audiences analyze --id <audienceId> --query "Summarize this audience and sho
 `columns.json` is an array of `{ name, dataType, agentInstruction }` (add `columnId` to update);
 `rows.json` is an array of `{ values: [{ columnId, value }] }` (add `rowId` to update, max 50 per
 call). Column and row IDs come from `gtm audiences get`.
+
+---
+
+### `gtm data-quality` (alias `dq`) — prepare, segment, and score your own records
+
+Data Quality (beta) cleans and classifies records you bring and returns the results inline;
+nothing is stored or written to another system. The default prepare steps (parse, validate,
+normalize) are free. `--line-type`, `--verify`, custom normalization (`--config-id`, `--rules`),
+`score`, and `segment` use credits. Addresses need `--verify` or custom normalization.
+
+```shell
+# Clean emails, phones, addresses, job titles, or person names (up to 30 per call)
+gtm dq prepare email " Jane.Doe@Example.COM " "jane@" --select input.email,value.fullEmail,isValid -f table
+gtm dq prepare phone "(617) 555-0123" --line-type
+gtm dq prepare address --file ./addresses.json --verify
+
+# Custom normalization: a saved config, or inline rules grouped by rule group
+gtm dq prepare phone "617.555.0123" --config-id <configId>
+gtm dq prepare phone "617.555.0123" --rules ./phone-rules.json   # { "phone": [{ "type": "INT_FORMAT", "value": "E164" }] }
+
+# Segment or score up to 25 records against saved configs
+gtm dq segment --config-ids <configId> --file ./leads.json
+gtm dq score --config-ids <configId> <configId> --file ./leads.json
+
+# Results are in input order; e.g. each lead's email and first score as CSV
+gtm dq score --config-ids <configId> --file ./leads.json \
+  | jq -r '.data.attributes.records[] | [.input.email, .outputs[0].value] | @csv'
+
+# Manage configs (kinds: normalize, score, segment)
+gtm dq configs list score
+gtm dq configs get score --id <configId>
+gtm dq configs create score --file ./icp-score.json
+gtm dq configs update score --id <configId> --file ./icp-score.json
+gtm dq configs delete score --id <configId>
+```
+
+`prepare --file` takes a JSON array of raw strings, or of objects holding pre-parsed components
+(e.g. `{ "number": "6175550123", "countryCode": "US" }` for a phone) to skip parsing. Results are
+positional: `data[i]` is the result for value `i`, and a value that can't be processed returns a
+`PrepareError` in its slot. `score` / `segment --file` takes a JSON array of records keyed by the
+field names the configs use. Config files hold the config's attributes (for `update`, send the
+complete config for score and segment configs); see the
+[Data Quality API reference](https://docs.gtm.ai/reference/preparecontroller_prepare) for each
+kind's schema.
+
+---
+
+### `gtm exports` — send records to connected systems
+
+Exports (beta) send ZoomInfo companies or contacts to the systems your organization has connected,
+such as a CRM. Running an export writes to that system; runs are asynchronous.
+
+```shell
+gtm exports list -f table
+gtm exports get --id <exportId>
+
+# Send up to 50 records as one run, then check on it
+gtm exports run --id <exportId> --company-ids 344589814 239305146
+gtm exports status --id <runId>
+
+# Or wait for the run to finish (exits non-zero if it fails or is stopped)
+gtm exports run --id <exportId> --contact-ids 1260398587 --wait
+```
 
 ---
 

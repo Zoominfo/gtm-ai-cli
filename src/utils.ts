@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { PageOptions } from './types.js';
 
@@ -119,4 +120,30 @@ export function normalizeEnrichEntries(
     }
     return entry;
   });
+}
+
+async function readJson(path: string, flag: string): Promise<unknown> {
+  const text = await readFile(path, 'utf8');
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`${flag} ${path} is not valid JSON: ${(err as Error).message}`);
+  }
+}
+
+// Reads a JSON file holding an array, optionally wrapped in { "<key>": [...] }.
+export async function readJsonArray(path: string, key: string): Promise<unknown[]> {
+  const parsed = await readJson(path, '--file');
+  const arr = Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown> | null)?.[key];
+  if (!Array.isArray(arr)) throw new Error(`--file must contain a JSON array of ${key} (or { "${key}": [...] })`);
+  return arr;
+}
+
+// Reads a JSON file holding a single object.
+export async function readJsonObject(path: string, flag = '--file'): Promise<Record<string, unknown>> {
+  const parsed = await readJson(path, flag);
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${flag} must contain a JSON object`);
+  }
+  return parsed as Record<string, unknown>;
 }

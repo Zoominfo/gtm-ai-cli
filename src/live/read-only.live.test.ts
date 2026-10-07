@@ -130,6 +130,26 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     expect(analyzed.status).toBe(0);
   }, 130_000);
 
+  it('data-quality configs list (all kinds)', () => {
+    for (const kind of ['normalize', 'score', 'segment']) {
+      expect(runJson(['data-quality', 'configs', 'list', kind]).status).toBe(0);
+    }
+  });
+
+  it('data-quality prepare email (free default steps)', () => {
+    const { status, data } = runJson(['data-quality', 'prepare', 'email', ' Jane.Doe@Example.COM ', '--select', 'value.fullEmail']);
+    expect(status).toBe(0);
+    expect(data).toEqual([{ 'value.fullEmail': 'jane.doe@example.com' }]);
+  });
+
+  it('exports list, then get (by derived id)', (ctx) => {
+    const { status, data } = runJson(['exports', 'list', '--page-size', '1']);
+    expect(status).toBe(0);
+    const exportId = pickField(records(data)[0], ['id']);
+    if (!exportId) return ctx.skip();
+    expect(runJson(['exports', 'get', '--id', exportId]).status).toBe(0);
+  });
+
   it('gtm-context get', () => {
     const { status } = runJson(['gtm-context', 'get']);
     expect(status).toBe(0);

@@ -15,7 +15,9 @@ import { registerAudiences } from './commands/audiences.js';
 import { registerAuth } from './commands/auth.js';
 import { registerCompanies } from './commands/companies.js';
 import { registerContacts } from './commands/contacts.js';
+import { registerDataQuality } from './commands/data-quality.js';
 import { registerEngagements } from './commands/engagements.js';
+import { registerExports } from './commands/exports.js';
 import { registerFeedback } from './commands/feedback.js';
 import { registerGtm } from './commands/gtm.js';
 import { registerIntent } from './commands/intent.js';
@@ -31,14 +33,16 @@ const program = new Command();
 
 program
   .name(resolveProgramName(process.argv))
-  .description('Command-line interface for the ZoomInfo GTM AI MCP server\n\nGlobal flags:\n  -d, --debug   Log MCP tool calls and responses to stderr (also: GTM_DEBUG=1)')
+  .description('Command-line interface for the ZoomInfo GTM AI MCP server\n\nGlobal flags:\n  -d, --debug   Log MCP and API calls and responses to stderr (also: GTM_DEBUG=1)')
   .version(pkg.version);
 
 registerAudiences(program);
 registerAuth(program);
 registerCompanies(program);
 registerContacts(program);
+registerDataQuality(program);
 registerEngagements(program);
+registerExports(program);
 registerFeedback(program);
 registerGtm(program);
 registerIntent(program);
@@ -56,7 +60,7 @@ program.addCommand(
     .action((cmds: string[]) => {
       let cmd: Command = program;
       for (const name of cmds) {
-        const sub = cmd.commands.find((c) => c.name() === name);
+        const sub = cmd.commands.find((c) => c.name() === name || c.aliases().includes(name));
         if (!sub) {
           console.error(`Unknown command: ${cmds.join(' ')}`);
           process.exit(1);
@@ -70,6 +74,6 @@ program.addCommand(
 process.on('beforeExit', () => { void closeClient(); });
 
 program.parseAsync().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
+  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });
