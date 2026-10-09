@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { projectFields, normalizeRows, toTable } from './output.js';
+import { projectFields, normalizeRows, toCsv, toTable } from './output.js';
 
 describe('projectFields', () => {
   it('projects dotted paths from an array of records', () => {
@@ -85,9 +85,30 @@ describe('normalizeRows', () => {
     expect(normalizeRows({ data: [], meta: { totalResults: 0 } })).toEqual([]);
   });
 
+  it('keeps a record with its own id intact rather than unwrapping its arrays', () => {
+    const audience = { id: 'aud-1', name: 'Accounts', columns: [{ id: 'col-1' }, { id: 'col-2' }] };
+    expect(normalizeRows(audience)).toEqual([audience]);
+    expect(projectFields(audience, ['id', 'name'])).toEqual({ id: 'aud-1', name: 'Accounts' });
+  });
+
+  it('turns scalar list items into value rows', () => {
+    expect(normalizeRows(['abc', null])).toEqual([{ value: 'abc' }, { value: null }]);
+  });
+
   it('hoists JSON:API attributes to top-level columns', () => {
     const rows = [{ id: '1', type: 'industry', attributes: { name: 'Software' } }];
     expect(normalizeRows(rows)).toEqual([{ name: 'Software', id: '1', type: 'industry' }]);
+  });
+});
+
+describe('toCsv', () => {
+  it('neutralizes cells that a spreadsheet would run as a formula', () => {
+    const csv = toCsv([{ subject: '=HYPERLINK("https://example.com")', note: '@SUM(A1)', tag: '-x' }]);
+    expect(csv.split('\r\n')[1]).toBe(`"'=HYPERLINK(""https://example.com"")",'@SUM(A1),'-x`);
+  });
+
+  it('leaves plain numbers alone, including negative IDs', () => {
+    expect(toCsv([{ id: -2032531906, sid: '-2032531906', score: '+5' }]).split('\r\n')[1]).toBe('-2032531906,-2032531906,+5');
   });
 });
 

@@ -42,6 +42,7 @@ export function registerGtm(program: Command): void {
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (opts: GtmUpdateOptions) => {
+      if (opts.source && opts.sourceFile) throw new Error('use either --source or --source-file, not both');
       const args: Record<string, unknown> = { query: opts.query };
       if (opts.sourceFile) {
         args.sourceMaterial = await readFile(opts.sourceFile, 'utf8');

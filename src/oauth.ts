@@ -39,6 +39,17 @@ function isOAuthTokenResponse(value: unknown): value is OAuthTokenResponse {
   );
 }
 
+// Token endpoint errors are JSON ({ error, error_description }); fall back to the raw body.
+async function oauthErrorDetail(res: Response): Promise<string> {
+  const body = await res.text();
+  try {
+    const { error, error_description } = JSON.parse(body) as Record<string, unknown>;
+    if (typeof error_description === 'string') return error_description;
+    if (typeof error === 'string') return error;
+  } catch { /* not JSON */ }
+  return body || `HTTP ${res.status}`;
+}
+
 async function registerClient(): Promise<string> {
   const res = await fetch(REGISTER_URL, {
     method: 'POST',
@@ -72,7 +83,7 @@ async function exchangeCode(code: string, clientId: string, verifier: string): P
       code_verifier: verifier,
     }),
   });
-  if (!res.ok) throw new Error(`Token exchange failed: ${await res.text()}`);
+  if (!res.ok) throw new Error(`Token exchange failed: ${await oauthErrorDetail(res)}`);
   const data: unknown = await res.json();
   if (!isOAuthTokenResponse(data)) throw new Error('Token exchange returned unexpected payload');
   return data;
@@ -88,18 +99,23 @@ export async function refreshAccessToken(refreshToken: string, clientId: string)
       client_id: clientId,
     }),
   });
-  if (!res.ok) throw new Error(`Token refresh failed: ${await res.text()}`);
+  if (!res.ok) throw new Error(`token refresh failed: ${await oauthErrorDetail(res)}`);
   const data: unknown = await res.json();
   if (!isOAuthTokenResponse(data)) throw new Error('Token refresh returned unexpected payload');
   return data;
 }
 
-export async function revokeToken(accessToken: string, clientId: string): Promise<void> {
+export async function revokeToken(
+  token: string,
+  clientId: string,
+  tokenTypeHint: 'access_token' | 'refresh_token',
+): Promise<void> {
   await fetch(REVOKE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      token: accessToken,
+      token,
+      token_type_hint: tokenTypeHint,
       client_id: clientId,
     }),
   });

@@ -59,9 +59,11 @@ function unwrapEnvelope(data: unknown): { rows: Row[]; list: boolean } {
       return { rows: record.data, list: true };
     }
 
-    // 2) Any key whose value is a non-empty array of objects. Lookup nests each field's
-    //    values one level deeper, as a lone `{ fuzzyMatch, data: [...] }` wrapper.
-    const items = Object.values(record).find(
+    // 2) Any key whose value is a non-empty array of objects. A record with its own `id`
+    //    is an entity (e.g. `audiences get`), not an envelope, so its arrays stay put.
+    //    Lookup nests each field's values one level deeper, as a lone
+    //    `{ fuzzyMatch, data: [...] }` wrapper.
+    const items = 'id' in record ? undefined : Object.values(record).find(
       (v): v is Row[] => Array.isArray(v) && v.length > 0 && isObject(v[0]),
     );
     if (items) {
@@ -126,8 +128,10 @@ function flattenOneLevel(rows: Row[]): Row[] {
 }
 
 // Pipeline shared by table + CSV: unwrap → JSON:API hoist → one-level dot flatten.
+// Scalar list items (e.g. an array of strings) become single-column `value` rows.
 export function normalizeRows(data: unknown): Row[] {
-  return flattenOneLevel(flattenJsonApi(unwrapEnvelope(data).rows));
+  const rows = unwrapEnvelope(data).rows.map(r => (isObject(r) ? r : { value: r }));
+  return flattenOneLevel(flattenJsonApi(rows));
 }
 
 // Dotted-path getter: getPath({a:{b:1}}, "a.b") → 1.
@@ -166,11 +170,21 @@ function stringify(val: unknown): string {
   return String(val);
 }
 
-function toCsv(rows: Row[]): string {
+// Spreadsheets run a cell starting with = + - @ (or tab/CR) as a formula, and text such as
+// email subjects is outside our control. Prefix such cells with ' unless they are plain
+// numbers (e.g. negative IDs).
+const FORMULA_START = /^[=+\-@\t\r]/;
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
+function neutralizeFormula(s: string): string {
+  return FORMULA_START.test(s) && !PLAIN_NUMBER.test(s) ? `'${s}` : s;
+}
+
+export function toCsv(rows: Row[]): string {
   if (!rows.length) return '';
   const headers = allKeys(rows);
   const escape = (val: unknown): string => {
-    const s = stringify(val);
+    const s = neutralizeFormula(stringify(val));
     return s.includes(',') || s.includes('\r') || s.includes('\n') || s.includes('"')
       ? `"${s.replace(/"/g, '""')}"`
       : s;

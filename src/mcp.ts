@@ -1,26 +1,21 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getValidCredentials } from './credentials.js';
+import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { getValidCredentials, loadCredentials, refreshCredentials } from './credentials.js';
 import { pkg } from './pkg.js';
+import type { Credentials } from './types.js';
 
 // TODO(phase-1-discovery): confirm the MCP endpoint URL.
 const MCP_URL = new URL('https://mcp.zoominfo.com/mcp');
 
+// Agentic tools (research, conversation intelligence, audience analysis) can run well past
+// the SDK's 60s default when the server is busy.
+const TOOL_CALL_TIMEOUT_MS = 5 * 60 * 1000;
+
+const NOT_LOGGED_IN = 'Not logged in. Run: gtm auth login';
+
 let cached: Client | null = null;
 
-async function getClient(): Promise<Client> {
-  if (cached) return cached;
-
-  const creds = await getValidCredentials();
-  if (!creds) {
-    console.error('Not logged in. Run: gtm auth login');
-    process.exit(1);
-  }
-  if (creds.expires_at !== null && Date.now() >= creds.expires_at) {
-    console.error('Session expired. Run: gtm auth login');
-    process.exit(1);
-  }
-
+async function connect(creds: Credentials): Promise<Client> {
   const transport = new StreamableHTTPClientTransport(MCP_URL, {
     requestInit: {
       headers: {
@@ -35,8 +30,41 @@ async function getClient(): Promise<Client> {
     { capabilities: {} },
   );
   await client.connect(transport);
-  cached = client;
   return client;
+}
+
+async function getClient(): Promise<Client> {
+  if (cached) return cached;
+  const creds = await getValidCredentials();
+  if (!creds) throw new Error(NOT_LOGGED_IN);
+  cached = await connect(creds);
+  return cached;
+}
+
+function isUnauthorized(err: unknown): boolean {
+  return err instanceof StreamableHTTPError && err.code === 401;
+}
+
+// Run an MCP request, refreshing the session once if the server rejects the token
+// before its recorded expiry (e.g. it was revoked or rotated elsewhere).
+async function withSession<T>(request: (client: Client) => Promise<T>): Promise<T> {
+  try {
+    return await request(await getClient());
+  } catch (err) {
+    if (!isUnauthorized(err)) throw err;
+  }
+
+  await closeClient();
+  const creds = loadCredentials();
+  if (!creds) throw new Error(NOT_LOGGED_IN);
+  const refreshed = await refreshCredentials(creds);
+  try {
+    cached = await connect(refreshed);
+    return await request(cached);
+  } catch (err) {
+    if (isUnauthorized(err)) throw new Error('Your session is no longer valid. Run: gtm auth login');
+    throw err;
+  }
 }
 
 interface McpToolContent {
@@ -162,8 +190,9 @@ function debugLog(label: string, payload: unknown): void {
 
 export async function mcpCall<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T> {
   debugLog(`call ${name}`, args);
-  const client = await getClient();
-  const res = await client.callTool({ name, arguments: args }) as McpToolResult;
+  const res = await withSession(client =>
+    client.callTool({ name, arguments: args }, undefined, { timeout: TOOL_CALL_TIMEOUT_MS }),
+  ) as McpToolResult;
   debugLog(`response ${name}`, res);
 
   if (res.isError) {
@@ -186,8 +215,7 @@ export interface McpTool {
 }
 
 export async function listMcpTools(): Promise<McpTool[]> {
-  const client = await getClient();
-  const res = await client.listTools();
+  const res = await withSession(client => client.listTools());
   return res.tools as McpTool[];
 }
 

@@ -55,6 +55,19 @@ describe('buildAudiencesGetArgs', () => {
       rowFilter: { operator: 'AND', filters: [] },
     });
   });
+
+  it('treats --preview-columns or --row-filter as implying --preview', () => {
+    expect(buildAudiencesGetArgs({ id: 'aud-1', previewColumns: ['col-a'] })).toEqual({
+      audienceId: 'aud-1',
+      previewRows: true,
+      previewColumnIds: ['col-a'],
+    });
+    expect(buildAudiencesGetArgs({ id: 'aud-1', rowFilter: '{"operator":"AND","filters":[]}' }).previewRows).toBe(true);
+  });
+
+  it('names --row-filter when its JSON is malformed', () => {
+    expect(() => buildAudiencesGetArgs({ id: 'aud-1', rowFilter: '{operator:AND}' })).toThrow(/--row-filter must be valid JSON/);
+  });
 });
 
 describe('buildAudiencesUpsertArgs', () => {

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { refreshAccessToken } from './oauth.js';
@@ -22,9 +22,16 @@ export function loadSavedClientId(): string | null {
   return id || null;
 }
 
+// Write via a temp file and rename, so a concurrent reader never sees a half-written file.
+function writeFileAtomic(path: string, data: string): void {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, data, { mode: 0o600 });
+  renameSync(tmp, path);
+}
+
 function saveClientId(clientId: string): void {
   mkdirSync(GTM_CONFIG_DIR, { recursive: true, mode: 0o700 });
-  writeFileSync(CLIENT_ID_PATH, clientId, { mode: 0o600 });
+  writeFileAtomic(CLIENT_ID_PATH, clientId);
 }
 
 export function saveOAuthCredentials({ clientId, access_token, refresh_token, expires_in }: SaveOAuthArgs): void {
@@ -37,7 +44,7 @@ export function saveOAuthCredentials({ clientId, access_token, refresh_token, ex
     client_id: clientId,
     expires_at: expires_in ? Date.now() + expires_in * 1000 : null,
   };
-  writeFileSync(CREDENTIALS_PATH, JSON.stringify(payload), { mode: 0o600 });
+  writeFileAtomic(CREDENTIALS_PATH, JSON.stringify(payload));
 }
 
 function isCredentials(value: unknown): value is Credentials {
@@ -52,21 +59,30 @@ function isCredentials(value: unknown): value is Credentials {
   );
 }
 
+// An unreadable or corrupt credentials file is treated as logged out.
 export function loadCredentials(): Credentials | null {
   if (!existsSync(CREDENTIALS_PATH)) return null;
-  const parsed: unknown = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf8'));
-  return isCredentials(parsed) ? parsed : null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf8'));
+    return isCredentials(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isExpired(creds: Credentials): boolean {
+  return creds.expires_at !== null && Date.now() >= creds.expires_at - TOKEN_EXPIRY_BUFFER_MS;
 }
 
 export async function getValidCredentials(): Promise<Credentials | null> {
   const creds = loadCredentials();
-  if (!creds) return null;
+  if (!creds || !isExpired(creds)) return creds;
+  return refreshCredentials(creds);
+}
 
-  const isExpired = creds.expires_at !== null && Date.now() >= creds.expires_at - TOKEN_EXPIRY_BUFFER_MS;
-  if (!isExpired) return creds;
-
-  if (!creds.refresh_token) return creds;
-
+// Exchange the refresh token for a new access token. Also used when the server rejects
+// a token before its recorded expiry (e.g. it was revoked).
+export async function refreshCredentials(creds: Credentials): Promise<Credentials> {
   try {
     const refreshed: OAuthTokenResponse = await refreshAccessToken(creds.refresh_token, creds.client_id);
     saveOAuthCredentials({
@@ -75,10 +91,14 @@ export async function getValidCredentials(): Promise<Credentials | null> {
       refresh_token: refreshed.refresh_token,
       expires_in: refreshed.expires_in,
     });
-    return loadCredentials();
-  } catch {
-    console.error('Session expired. Run: gtm auth login');
-    process.exit(1);
+    const saved = loadCredentials();
+    if (!saved) throw new Error('could not save the refreshed credentials');
+    return saved;
+  } catch (err) {
+    // Another process may have refreshed (and rotated) the token first; use what it saved.
+    const latest = loadCredentials();
+    if (latest && latest.refresh_token !== creds.refresh_token && !isExpired(latest)) return latest;
+    throw new Error(`Could not refresh your session (${(err as Error).message}). Run: gtm auth login`);
   }
 }
 
