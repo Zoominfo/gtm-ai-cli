@@ -82,3 +82,45 @@ describe('getValidCredentials', () => {
     await expect(getValidCredentials()).rejects.toThrow(/Could not refresh your session \(fetch failed\)\. Run: gtm auth login/);
   });
 });
+
+describe('withSession', () => {
+  beforeEach(() => {
+    writeCreds({ expires_at: Date.now() + HOUR });
+    refreshAccessToken.mockResolvedValue({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 });
+  });
+
+  it('runs the request with the saved token', async () => {
+    const { withSession } = await load();
+    await expect(withSession(async creds => creds.access_token)).resolves.toBe('old-access');
+    expect(refreshAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('refreshes once and retries when the token is rejected', async () => {
+    const { withSession, SessionRejected } = await load();
+    const request = vi.fn(async (creds: { access_token: string }) => {
+      if (creds.access_token === 'old-access') throw new SessionRejected();
+      return creds.access_token;
+    });
+    await expect(withSession(request)).resolves.toBe('new-access');
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the user to log in when the refreshed token is also rejected', async () => {
+    const { withSession, SessionRejected } = await load();
+    await expect(withSession(async () => { throw new SessionRejected(); }))
+      .rejects.toThrow('Your session is no longer valid. Run: gtm auth login');
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes other errors through without refreshing', async () => {
+    const { withSession } = await load();
+    await expect(withSession(async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    expect(refreshAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('asks the user to log in when there is no saved session', async () => {
+    rmSync(join(configDir, 'credentials'));
+    const { withSession } = await load();
+    await expect(withSession(async () => 'unreachable')).rejects.toThrow('Not logged in. Run: gtm auth login');
+  });
+});

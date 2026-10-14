@@ -1,8 +1,7 @@
 import type { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
 import { mcpCall } from '../mcp.js';
 import { print, FORMAT_OPTION, SELECT_OPTION } from '../output.js';
-import { parseInteger } from '../utils.js';
+import { parseInteger, readJsonArray } from '../utils.js';
 
 // GTM Studio audiences. The write tools (create/update/columns/rows) drive a downstream
 // AI agent via an agentInstruction, so those commands require --instruction — a complete,
@@ -144,20 +143,6 @@ export function buildAudiencesRowsArgs(id: string, rows: unknown[], instruction:
 
 export function buildAudiencesAnalyzeArgs(opts: AudiencesAnalyzeOptions): Record<string, unknown> {
   return { audienceId: opts.id, query: opts.query };
-}
-
-// Reads a JSON file containing an array, optionally wrapped in { "<key>": [...] }.
-async function readJsonArray(path: string, key: string): Promise<unknown[]> {
-  const text = await readFile(path, 'utf8');
-  const parsed: unknown = JSON.parse(text);
-  const arr = Array.isArray(parsed)
-    ? parsed
-    : (parsed as Record<string, unknown>)[key];
-  if (!Array.isArray(arr)) {
-    console.error(`Error: --file must contain a JSON array of ${key} (or { "${key}": [...] })`);
-    process.exit(1);
-  }
-  return arr;
 }
 
 export function registerAudiences(program: Command): void {
