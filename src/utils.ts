@@ -106,7 +106,9 @@ export function normalizeEnrichEntries(
     const unknownKeys: string[] = [];
     for (const [key, value] of Object.entries(raw)) {
       const mcpKey = aliases[key] ?? key;
-      if (validKeys.includes(mcpKey)) entry[mcpKey] = value;
+      // The enrich tools take every identifier as a string, but IDs in JSON output (e.g. a
+      // contact's company.id) are often numbers.
+      if (validKeys.includes(mcpKey)) entry[mcpKey] = typeof value === 'number' ? String(value) : value;
       else unknownKeys.push(key);
     }
     if (unknownKeys.length > 0) {
@@ -123,7 +125,9 @@ export function normalizeEnrichEntries(
 }
 
 async function readJson(path: string, flag: string): Promise<unknown> {
-  const text = await readFile(path, 'utf8');
+  const text = await readFile(path, 'utf8').catch((err: Error) => {
+    throw new Error(`${flag} could not be read: ${err.message}`);
+  });
   try {
     return JSON.parse(text);
   } catch (err) {

@@ -32,8 +32,8 @@ describe('projectFields', () => {
     expect(projectFields({ data: [], meta: { totalResults: 0 } }, ['id'])).toEqual([]);
   });
 
-  it('yields undefined for missing paths', () => {
-    expect(projectFields({ id: 1 }, ['id', 'missing.deep'])).toEqual({ id: 1, 'missing.deep': undefined });
+  it('projects missing paths to null, so every row keeps the selected keys', () => {
+    expect(projectFields({ id: 1 }, ['id', 'missing.deep'])).toEqual({ id: 1, 'missing.deep': null });
   });
 });
 
@@ -57,9 +57,9 @@ describe('bulk enrich responses', () => {
 
   it('keeps projected rows aligned with their inputs', () => {
     expect(projectFields(bulk, ['id', 'error'])).toEqual([
-      { id: '1', error: undefined },
-      { id: undefined, error: NO_MATCH },
-      { id: '3', error: undefined },
+      { id: '1', error: null },
+      { id: null, error: NO_MATCH },
+      { id: '3', error: null },
     ]);
   });
 

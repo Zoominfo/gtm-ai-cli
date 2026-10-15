@@ -101,7 +101,7 @@ Every subcommand accepts `-f, --format`. The `table` and `csv` formats auto-flat
 ```shell
 gtm companies search --industry software -f table
 gtm contacts search --management-level "C Level Exec" -f jsonl > c-level-contacts.jsonl
-gtm-context get -f yaml
+gtm gtm-context get -f yaml
 ```
 
 ### Projecting fields with `--select`
@@ -347,16 +347,16 @@ This is the context that shapes how every other ZoomInfo tool interprets your qu
 
 ```shell
 # Compressed view (~1k tokens)
-gtm-context get
+gtm gtm-context get
 
 # Full expanded profiles
-gtm-context get --detailed -f yaml
+gtm gtm-context get --detailed -f yaml
 
 # Update — synthesizes unstructured content into structured records (admin only)
-gtm-context update --query "Update competitive intelligence" --source "Our main competitors are X, Y, Z. X is strong in …"
+gtm gtm-context update --query "Update competitive intelligence" --source "Our main competitors are X, Y, Z. X is strong in …"
 
 # From a file (large inputs)
-gtm-context update --query "Create buyer personas from these interviews" --source-file ./interview-notes.txt
+gtm gtm-context update --query "Create buyer personas from these interviews" --source-file ./interview-notes.txt
 ```
 
 ---

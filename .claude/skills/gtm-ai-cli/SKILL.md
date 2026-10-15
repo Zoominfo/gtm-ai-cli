@@ -222,10 +222,10 @@ Engagement IDs are opaque strings from `gtm engagements list` — quote them ver
 The org's GTM configuration (offerings, ICPs, buyer personas, competitors, strategic priorities). Reading is free (zero credits). Updates require admin permissions.
 
 ```bash
-gtm-context get                                                     # compressed (~1k tokens)
-gtm-context get --detailed -f yaml                                  # full expanded profiles
-gtm-context update --query "Update competitive intelligence" --source "Our main competitors are X, Y, Z…"
-gtm-context update --query "Create buyer personas from these interviews" --source-file ./interview-notes.txt
+gtm gtm-context get                                                 # compressed (~1k tokens)
+gtm gtm-context get --detailed -f yaml                              # full expanded profiles
+gtm gtm-context update --query "Update competitive intelligence" --source "Our main competitors are X, Y, Z…"
+gtm gtm-context update --query "Create buyer personas from these interviews" --source-file ./interview-notes.txt
 ```
 
 The `update` query frames the agent's intent; `--source` or `--source-file` (not both) provides the substance to analyze (max ~2,000 words per call). When omitted, the update agent operates on existing configuration directly (good for archive, rename, simple edits).
@@ -311,7 +311,7 @@ Every subcommand accepts `-f, --format <format>`:
 ```bash
 gtm companies search --industry software -f table
 gtm contacts search --management-level "C Level Exec" -f jsonl > c-level-contacts.jsonl
-gtm-context get -f yaml
+gtm gtm-context get -f yaml
 ```
 
 For deeply nested responses, prefer `json` + `jq` or `yaml`. `csv` / `table` will stringify second-level-nested structures into a single cell.

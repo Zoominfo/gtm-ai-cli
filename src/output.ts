@@ -152,7 +152,8 @@ function getPath(obj: unknown, path: string): unknown {
 // Unwraps the response envelope first so projection runs over the record array. A list
 // response always projects to an array (whatever the hit count); a lone record stays an object.
 export function projectFields(data: unknown, paths: string[]): unknown {
-  const pick = (row: unknown): Row => Object.fromEntries(paths.map(p => [p, getPath(row, p)]));
+  // A missing path projects to null, so every row keeps the selected keys.
+  const pick = (row: unknown): Row => Object.fromEntries(paths.map(p => [p, getPath(row, p) ?? null]));
   // Hoist JSON:API `attributes` so intuitive paths like `name` or `revenue` resolve, while
   // getPath still handles genuinely-nested paths (e.g. company.id).
   const { rows, list } = unwrapEnvelope(data);
