@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveProgramName, parseInteger, parseId } from './utils.js';
+import { resolveProgramName, parseInteger, parseId, readJsonArray, readJsonObject } from './utils.js';
 
 describe('resolveProgramName', () => {
   it('returns zoominfo when invoked via the zoominfo npm bin shim (argv[1])', () => {
@@ -61,5 +61,12 @@ describe('parseId', () => {
     for (const bad of ['0', 'acme.com', '12.5']) {
       expect(() => parseId(bad, '--company-id')).toThrow(/--company-id must be an integer ZoomInfo ID/);
     }
+  });
+});
+
+describe('JSON file readers', () => {
+  it('name the flag when a file cannot be read', async () => {
+    await expect(readJsonArray('/nonexistent/leads.json', 'records')).rejects.toThrow(/^--file could not be read: ENOENT/);
+    await expect(readJsonObject('/nonexistent/rules.json', '--rules')).rejects.toThrow(/^--rules could not be read: ENOENT/);
   });
 });
