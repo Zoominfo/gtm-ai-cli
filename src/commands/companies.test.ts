@@ -152,6 +152,10 @@ describe('normalizeCompaniesEnrichEntries', () => {
     ]);
   });
 
+  it('passes numeric IDs as strings, as the enrich tool expects', () => {
+    expect(normalizeCompaniesEnrichEntries([{ id: 24231957 }])).toEqual([{ companyId: '24231957' }]);
+  });
+
   it('rejects unsupported keys instead of dropping them', () => {
     expect(() => normalizeCompaniesEnrichEntries([{ domain: 'stripe.com' }, { url: 'acme.com' }]))
       .toThrow(/entry 2 has unsupported key\(s\): url/);
