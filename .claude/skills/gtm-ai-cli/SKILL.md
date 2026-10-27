@@ -31,7 +31,7 @@ gtm auth login
 
 ## The `lookup` workflow — read this first
 
-ZoomInfo's search endpoints reject free-text industry/metro/topic strings with HTTP 422. **Always look up the canonical ID first**, then pass it to the search filters. Treat `gtm lookup` as a required first step for any filtered search.
+Search filters only accept the values `lookup` returns. Depending on the filter, ZoomInfo either rejects a free-text value with an error or drops that filter from the search and the CLI prints a `Warning:` to stderr — so an unmatched `--industry` returns every company the other filters allow. **Always look up the canonical ID first**, then pass it to the search filters. Treat `gtm lookup` as a required first step for any filtered search.
 
 ```bash
 # Industries containing "software"
@@ -429,7 +429,7 @@ Pagination lives at `.meta.page.{number, total}` and `.meta.totalResults` for se
 ## Important behaviors
 
 - **Search commands refuse to run with zero filters.** Running e.g. `gtm companies search` with no flags exits with a guidance error listing common filters. This is intentional — unfiltered searches return unbounded uninteresting results.
-- **Filter values must be canonical IDs / names** from the `lookup` endpoint. Free-text industry / metro / topic strings return HTTP 422.
+- **Filter values must be canonical IDs / names** from the `lookup` endpoint. A free-text value either fails with an error or is dropped from the search with a `Warning:` on stderr. Treat that warning as a failed search: the results aren't filtered by that value, so look it up and rerun.
 - **Bulk enrich caps at 10 entries per call.** Prefer `enrich --file` (one MCP call for up to 10 identifiers) over looping. For larger sets, batch into chunks of 10.
 - **For high-volume calls, prefer in this order:** (1) native bulk `enrich --file`; (2) bounded shell parallelism (`xargs -P4` / `parallel -j4`); (3) a sequential loop sleeping **at most 1 second** between calls. Use bounded parallelism **or** the ≤1s-sleep loop, never both, and never unbounded fan-out — both guards exist to respect the subscription's rate limits. See the callout at the top of *Common multi-step workflows*.
 - **Some MCP tools double-encode their response payload** (the text content block is a JSON string of a JSON object). The CLI handles this transparently — agents shouldn't need to care.

@@ -122,7 +122,7 @@ gtm companies search --industry software --select name,company.id -f csv > orgs.
 
 ### `gtm lookup` — get exact filter values
 
-ZoomInfo's search endpoints reject unknown industry/metro/topic strings with 422. **Always look up the canonical ID first**, then pass it to the search filters.
+Search filters only accept the values `lookup` returns. Depending on the filter, ZoomInfo either rejects an unrecognised value with an error or drops that filter from the search — the CLI then prints a `Warning:` to stderr, and the results aren't filtered by it. **Always look up the canonical ID first**, then pass it to the search filters.
 
 ```shell
 # Industries containing "software"
