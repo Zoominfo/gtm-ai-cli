@@ -102,19 +102,30 @@ function unwrap(res: McpToolResult): unknown {
   return blocks;
 }
 
-// Map MCP error field names → corresponding `gtm lookup --field <name>` for hints.
+// Map MCP field names (from errors and fieldResolution warnings) → corresponding
+// `gtm lookup --field <name>` for hints.
 const LOOKUP_FIELD_FOR: Record<string, string> = {
   topics: 'intent-topics',
   intentTopic: 'intent-topics',
   industry: 'industries',
   industries: 'industries',
+  industryList: 'industries',
   industryCode: 'industries',
   industryCodes: 'industries',
+  naicsCodes: 'naics-codes',
+  sicCodes: 'sic-codes',
   department: 'departments',
   departments: 'departments',
+  departmentList: 'departments',
+  jobFunctionList: 'job-functions',
   metro: 'metro-regions',
   metroRegion: 'metro-regions',
   metroRegions: 'metro-regions',
+  country: 'countries',
+  continent: 'continents',
+  employeeCount: 'employee-count',
+  recentFundingRoundTypes: 'funding-round-types',
+  allFundingRoundTypes: 'funding-round-types',
   managementLevel: 'management-levels',
   managementLevels: 'management-levels',
   scoopType: 'scoop-types',
@@ -126,6 +137,11 @@ const LOOKUP_FIELD_FOR: Record<string, string> = {
   techVendor: 'tech-vendors',
   techVendorId: 'tech-vendors',
 };
+
+function lookupHint(field: string): string | undefined {
+  const lookup = LOOKUP_FIELD_FOR[field];
+  return lookup && `Run \`gtm lookup --field ${lookup}\` to see valid values.`;
+}
 
 // Strip the layers of wrapping the MCP server adds to error messages and tack
 // on a contextual hint when we recognise the pattern. Reduces this:
@@ -145,11 +161,8 @@ function friendlyError(raw: string): string {
   // Invalid lookup value → point at the lookup command.
   const invalidField = stripped.match(/Invalid '?(\w+)'? (?:requested|value)/i)
     ?? stripped.match(/\(field:\s*(\w+)\)/i);
-  if (invalidField) {
-    const field = invalidField[1];
-    const lookup = LOOKUP_FIELD_FOR[field];
-    if (lookup) hints.push(`Run \`gtm lookup --field ${lookup}\` to see valid values.`);
-  }
+  const lookup = invalidField && lookupHint(invalidField[1]);
+  if (lookup) hints.push(lookup);
 
   // Auth-shaped errors.
   if (/\b(unauthor[iz]ed|invalid token|token (expired|invalid))/i.test(stripped)) {
@@ -165,6 +178,25 @@ function friendlyError(raw: string): string {
   return hints.length ? `${head}\n  → ${hints.join('\n  → ')}` : head;
 }
 
+interface FieldResolution {
+  warning?: unknown;
+  hint?: unknown;
+}
+
+// Search tools drop some filters whose values they can't match, and report that only as a
+// `warning` in `meta.fieldResolution` — which table, csv, jsonl, and --select output leave
+// out. Format each warning (plus any hint) for stderr so it shows whatever the output format.
+// Exported for unit tests.
+export function filterWarnings(data: unknown): string[] {
+  const resolution = (data as { meta?: { fieldResolution?: unknown } } | null)?.meta?.fieldResolution;
+  if (!resolution || typeof resolution !== 'object') return [];
+  return Object.entries(resolution as Record<string, FieldResolution | null>).flatMap(([field, r]) => {
+    if (typeof r?.warning !== 'string') return [];
+    const hints = [typeof r.hint === 'string' ? r.hint : undefined, lookupHint(field)].filter(Boolean);
+    return [[`Warning: ${r.warning}`, ...hints].join('\n  → ')];
+  });
+}
+
 export async function mcpCall<T = unknown>(name: string, args: Record<string, unknown> = {}): Promise<T> {
   debugLog(`call ${name}`, args);
   const res = await withClient(client =>
@@ -178,7 +210,9 @@ export async function mcpCall<T = unknown>(name: string, args: Record<string, un
     process.exit(1);
   }
 
-  return unwrap(res) as T;
+  const data = unwrap(res);
+  for (const warning of filterWarnings(data)) console.error(warning);
+  return data as T;
 }
 
 export interface McpTool {

@@ -1,5 +1,5 @@
 import { it, expect, beforeAll } from 'vitest';
-import { liveDescribe, runJson, records, pickField } from './helpers.js';
+import { liveDescribe, runCli, runJson, records, pickField } from './helpers.js';
 
 // Read-only end-to-end coverage: one live call per non-mutating command, chaining real
 // ZoomInfo IDs derived from preceding searches. Assertions are deliberately tolerant of
@@ -188,5 +188,15 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     const { status, data } = runJson(['companies', 'search', '--industry', 'software', '--page-size', '2', '--select', 'id,name']);
     expect(status).toBe(0);
     expect(data).not.toBeNull();
+  });
+
+  it('warns on stderr when the server drops a filter it cannot match', () => {
+    const { status, stderr } = runCli([
+      'companies', 'search', '--country', 'United Kingdom', '--industry', 'not-a-real-industry',
+      '--page-size', '1', '--format', 'table',
+    ]);
+    expect(status).toBe(0);
+    expect(stderr).toContain('industryList');
+    expect(stderr).toContain('gtm lookup --field industries');
   });
 });

@@ -10,7 +10,7 @@ Implemented suites:
   search·enrich·similar·recommended, intent search, scoops search, signals, engagements
   list·ask, audiences list·get·analyze, data-quality configs list · prepare email (free steps
   only), exports list·get, lookup, gtm-context get, research account·contact,
-  raw list-tools·call, plus a `--select` projection check). IDs are chained from preceding searches; assertions tolerate
+  raw list-tools·call, plus a `--select` projection check and a dropped-filter warning check). IDs are chained from preceding searches; assertions tolerate
   empty result sets and varying response shapes.
 - `writes.live.test.ts` — mutating tools (`feedback submit`, `gtm-context update`), gated.
 
