@@ -142,6 +142,15 @@ liveDescribe('ZoomInfo CLI — read-only live coverage', () => {
     expect(data).toEqual([{ 'value.fullEmail': 'jane.doe@example.com' }]);
   });
 
+  it('data-quality prepare company-name and url (free default steps)', () => {
+    const company = runJson(['data-quality', 'prepare', 'company-name', 'Acme Holdings, Inc.', '--select', 'value.companyName']);
+    expect(company.status).toBe(0);
+    expect(company.data).toEqual([{ 'value.companyName': 'Acme Holdings' }]);
+    const url = runJson(['data-quality', 'prepare', 'url', 'www.example.co.uk/path', '--select', 'value.registeredDomain']);
+    expect(url.status).toBe(0);
+    expect(url.data).toEqual([{ 'value.registeredDomain': 'example.co.uk' }]);
+  });
+
   it('exports list, then get (by derived id)', (ctx) => {
     const { status, data } = runJson(['exports', 'list', '--page-size', '1']);
     expect(status).toBe(0);

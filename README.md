@@ -475,14 +475,20 @@ call). Column and row IDs come from `gtm audiences get`.
 
 Data Quality (beta) cleans and classifies records you bring and returns the results inline;
 nothing is stored or written to another system. The default prepare steps (parse, validate,
-normalize) are free. `--line-type`, `--verify`, custom normalization (`--config-id`, `--rules`),
-`score`, and `segment` use credits.
+normalize) are free. Enrichments (`--line-type`, `--verify`, `--threat`, `--threat-type`,
+`--classify`), custom normalization (`--config-id`, `--rules`), `score`, and `segment` use credits.
 
 ```shell
-# Clean emails, phones, addresses, job titles, or person names (up to 30 per call)
+# Clean emails, phones, addresses, job titles, person names, company names, or URLs (up to 30 per call)
 gtm dq prepare email " Jane.Doe@Example.COM " "jane@" --select input.email,value.fullEmail,isValid -f table
-gtm dq prepare phone "(617) 555-0123" --line-type
+gtm dq prepare company-name "Acme Holdings, Inc." --select value.companyName,value.corporateIdentifiers
+gtm dq prepare url www.example.co.uk/path --select value.url,value.registeredDomain
+
+# Enrichments: deliverability, sending safety, line type, or job-title classification
+gtm dq prepare email jane@example.com --verify --threat-type
+gtm dq prepare phone "(617) 555-0123" --line-type --verify
 gtm dq prepare address --file ./addresses.json --verify
+gtm dq prepare job-title "VP of Sales" --classify
 
 # Custom normalization: a saved config, or inline rules grouped by rule group
 gtm dq prepare phone "+1 617 555 0123" --config-id <configId>
@@ -504,12 +510,13 @@ gtm dq configs update score --id <configId> --file ./icp-score.json
 gtm dq configs delete score --id <configId>
 ```
 
-`prepare --file` takes a JSON array of raw strings, or of objects holding pre-parsed components
-(e.g. `{ "number": "6175550123", "countryCode": "US" }` for a phone) to skip parsing. Results are
+`prepare --file` takes a JSON array of raw strings, or, for phone, email, address, and person-name,
+of objects holding pre-parsed components (e.g. `{ "number": "6175550123", "countryCode": "US" }`
+for a phone) to skip parsing. Results are
 positional: `data[i]` is the result for value `i`, and a value that can't be processed returns a
 `PrepareError` in its slot. `score` / `segment --file` takes a JSON array of records keyed by the
-field names the configs use. Config files hold the config's attributes (for `update`, send the
-complete config for score and segment configs); see the
+field names the configs use. Config files hold the config's attributes (for `update`, just the
+ones to change; a list you send, such as a segment config's `segments`, replaces the whole list); see the
 [Data Quality API reference](https://docs.gtm.ai/reference/preparecontroller_prepare) for each
 kind's schema.
 

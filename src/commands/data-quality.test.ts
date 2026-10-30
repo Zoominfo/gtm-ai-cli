@@ -20,11 +20,32 @@ describe('buildPrepareBody', () => {
     });
   });
 
-  it('adds the opt-in enrichment for phone and address only', () => {
-    expect(buildPrepareBody('phone', ['1'], { lineType: true })).toMatchObject({ data: { attributes: { enrichments: ['LINE_TYPE'] } } });
-    expect(buildPrepareBody('address', ['1 Main St'], { verify: true })).toMatchObject({ data: { attributes: { enrichments: ['VERIFY'] } } });
-    expect(() => buildPrepareBody('email', ['a@b.co'], { lineType: true })).toThrow(/phone only/);
-    expect(() => buildPrepareBody('phone', ['1'], { verify: true })).toThrow(/address only/);
+  it('uses the raw-value field of the company-name and url types', () => {
+    expect(buildPrepareBody('company-name', ['Acme, Inc.'])).toEqual({
+      data: { type: 'CompanyNamePrepareRequest', attributes: { items: [{ companyName: 'Acme, Inc.' }] } },
+    });
+    expect(buildPrepareBody('url', ['example.com'])).toMatchObject({
+      data: { type: 'UrlPrepareRequest', attributes: { items: [{ url: 'example.com' }] } },
+    });
+  });
+
+  it('maps each enrichment flag to its API enrichments', () => {
+    expect(buildPrepareBody('phone', ['1'], { lineType: true, verify: true })).toMatchObject({ data: { attributes: { enrichments: ['LINE_TYPE', 'VERIFICATION'] } } });
+    expect(buildPrepareBody('email', ['a@b.co'], { verify: true, threat: true })).toMatchObject({ data: { attributes: { enrichments: ['VERIFICATION', 'THREAT'] } } });
+    expect(buildPrepareBody('address', ['1 Main St'], { verify: true })).toMatchObject({ data: { attributes: { enrichments: ['VERIFICATION'] } } });
+    expect(buildPrepareBody('job-title', ['CEO'], { classify: true })).toMatchObject({ data: { attributes: { enrichments: ['CLASSIFICATION'] } } });
+  });
+
+  it('requests THREAT along with --threat-type, once', () => {
+    expect(buildPrepareBody('email', ['a@b.co'], { threatType: true })).toMatchObject({ data: { attributes: { enrichments: ['THREAT', 'THREAT_TYPE'] } } });
+    expect(buildPrepareBody('email', ['a@b.co'], { threat: true, threatType: true })).toMatchObject({ data: { attributes: { enrichments: ['THREAT', 'THREAT_TYPE'] } } });
+  });
+
+  it('rejects an enrichment flag on a type it does not apply to', () => {
+    expect(() => buildPrepareBody('email', ['a@b.co'], { lineType: true })).toThrow('--line-type applies to phone only');
+    expect(() => buildPrepareBody('job-title', ['CEO'], { verify: true })).toThrow('--verify applies to phone, email, address only');
+    expect(() => buildPrepareBody('phone', ['1'], { threat: true })).toThrow(/email only/);
+    expect(() => buildPrepareBody('person-name', ['Jane Doe'], { classify: true })).toThrow(/job-title only/);
   });
 
   it('applies a saved config or inline rules, not both', () => {
