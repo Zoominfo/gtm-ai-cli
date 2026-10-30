@@ -10,13 +10,26 @@ const PREPARE_TYPES = {
   address: { type: 'AddressPrepareRequest', field: 'address', rules: true },
   'job-title': { type: 'JobTitlePrepareRequest', field: 'jobTitle', rules: true },
   'person-name': { type: 'PersonNamePrepareRequest', field: 'name', rules: true },
+  'company-name': { type: 'CompanyNamePrepareRequest', field: 'companyName', rules: true },
+  url: { type: 'UrlPrepareRequest', field: 'url', rules: true },
 } as const;
 
 type PrepareType = keyof typeof PREPARE_TYPES;
 
-interface PrepareOptions {
-  lineType?: boolean;
-  verify?: boolean;
+type Enrichment = 'lineType' | 'verify' | 'threat' | 'threatType' | 'classify';
+
+// Opt-in enrichments, which use credits: each one's flag, the API enrichments it requests, and
+// the types it applies to.
+const ENRICHMENTS: Record<Enrichment, { flag: string; enrichments: string[]; types: PrepareType[] }> = {
+  lineType: { flag: '--line-type', enrichments: ['LINE_TYPE'], types: ['phone'] },
+  verify: { flag: '--verify', enrichments: ['VERIFICATION'], types: ['phone', 'email', 'address'] },
+  threat: { flag: '--threat', enrichments: ['THREAT'], types: ['email'] },
+  // THREAT_TYPE classifies an unsafe THREAT verdict, so the API rejects it on its own.
+  threatType: { flag: '--threat-type', enrichments: ['THREAT', 'THREAT_TYPE'], types: ['email'] },
+  classify: { flag: '--classify', enrichments: ['CLASSIFICATION'], types: ['job-title'] },
+};
+
+interface PrepareOptions extends Partial<Record<Enrichment, boolean>> {
   configId?: string;
   rules?: Record<string, unknown>;
 }
@@ -26,15 +39,16 @@ interface PrepareOptions {
 export function buildPrepareBody(prepareType: PrepareType, values: unknown[], opts: PrepareOptions = {}): Record<string, unknown> {
   const domain = PREPARE_TYPES[prepareType];
   if (values.length === 0) throw new Error('provide values to prepare, or --file');
-  if (opts.lineType && prepareType !== 'phone') throw new Error('--line-type applies to phone only');
-  if (opts.verify && prepareType !== 'address') throw new Error('--verify applies to address only');
+  const selected = (Object.keys(ENRICHMENTS) as Enrichment[]).filter(key => opts[key]).map(key => ENRICHMENTS[key]);
+  const unsupported = selected.find(({ types }) => !types.includes(prepareType));
+  if (unsupported) throw new Error(`${unsupported.flag} applies to ${unsupported.types.join(', ')} only`);
   if (opts.configId && opts.rules) throw new Error('use either --config-id or --rules, not both');
   if ((opts.configId || opts.rules) && !domain.rules) throw new Error(`${prepareType} has no custom normalization`);
 
   const items = values.map(value => (typeof value === 'string' ? { [domain.field]: value } : { components: value }));
   const attributes: Record<string, unknown> = { items };
-  if (opts.lineType) attributes.enrichments = ['LINE_TYPE'];
-  if (opts.verify) attributes.enrichments = ['VERIFICATION'];
+  const enrichments = [...new Set(selected.flatMap(e => e.enrichments))];
+  if (enrichments.length > 0) attributes.enrichments = enrichments;
   if (opts.configId) attributes.config = { normalizationRules: { configId: opts.configId } };
   if (opts.rules) attributes.config = { normalizationRules: { rules: opts.rules } };
   return { data: { type: domain.type, attributes } };
@@ -91,9 +105,12 @@ export function registerDataQuality(program: Command): void {
     .description('Parse, validate, and normalize up to 30 values of one type (free unless an opt-in step is used)')
     .addArgument(new Argument('<type>', 'Value type').choices(Object.keys(PREPARE_TYPES)))
     .argument('[values...]', 'Raw values to prepare')
-    .option('--file <path>', 'JSON array of values instead of arguments: strings, or objects of pre-parsed components')
+    .option('--file <path>', 'JSON array of values instead of arguments: strings, or objects of pre-parsed components (phone, email, address, person-name)')
     .option('--line-type', 'Phone only: classify the line type, e.g. mobile or landline (uses credits)')
-    .option('--verify', 'Address only: verify deliverability, address type, and coordinates (uses credits)')
+    .option('--verify', 'Phone, email, or address: check the line is in service, or the mailbox or address is deliverable; addresses also get their type and coordinates (uses credits)')
+    .option('--threat', 'Email only: flag addresses that are unsafe to send to (uses credits)')
+    .option('--threat-type', 'Email only: also name why an address is unsafe, e.g. a spam trap (implies --threat; uses credits)')
+    .option('--classify', 'Job title only: classify the department, job function, management level, and board membership (uses credits)')
     .option('--config-id <id>', 'Apply a saved normalization config (uses credits)')
     .option('--rules <path>', 'Apply normalization rules from a JSON file, grouped by rule group (uses credits)')
     .option(...FORMAT_OPTION)
