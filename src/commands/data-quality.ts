@@ -34,7 +34,7 @@ export function buildPrepareBody(prepareType: PrepareType, values: unknown[], op
   const items = values.map(value => (typeof value === 'string' ? { [domain.field]: value } : { components: value }));
   const attributes: Record<string, unknown> = { items };
   if (opts.lineType) attributes.enrichments = ['LINE_TYPE'];
-  if (opts.verify) attributes.enrichments = ['VERIFY'];
+  if (opts.verify) attributes.enrichments = ['VERIFICATION'];
   if (opts.configId) attributes.config = { normalizationRules: { configId: opts.configId } };
   if (opts.rules) attributes.config = { normalizationRules: { rules: opts.rules } };
   return { data: { type: domain.type, attributes } };

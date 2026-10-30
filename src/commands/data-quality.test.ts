@@ -22,7 +22,7 @@ describe('buildPrepareBody', () => {
 
   it('adds the opt-in enrichment for phone and address only', () => {
     expect(buildPrepareBody('phone', ['1'], { lineType: true })).toMatchObject({ data: { attributes: { enrichments: ['LINE_TYPE'] } } });
-    expect(buildPrepareBody('address', ['1 Main St'], { verify: true })).toMatchObject({ data: { attributes: { enrichments: ['VERIFY'] } } });
+    expect(buildPrepareBody('address', ['1 Main St'], { verify: true })).toMatchObject({ data: { attributes: { enrichments: ['VERIFICATION'] } } });
     expect(() => buildPrepareBody('email', ['a@b.co'], { lineType: true })).toThrow(/phone only/);
     expect(() => buildPrepareBody('phone', ['1'], { verify: true })).toThrow(/address only/);
   });
