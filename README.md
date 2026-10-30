@@ -515,8 +515,8 @@ of objects holding pre-parsed components (e.g. `{ "number": "6175550123", "count
 for a phone) to skip parsing. Results are
 positional: `data[i]` is the result for value `i`, and a value that can't be processed returns a
 `PrepareError` in its slot. `score` / `segment --file` takes a JSON array of records keyed by the
-field names the configs use. Config files hold the config's attributes (for `update`, send the
-complete config for score and segment configs); see the
+field names the configs use. Config files hold the config's attributes (for `update`, just the
+ones to change; a list you send, such as a segment config's `segments`, replaces the whole list); see the
 [Data Quality API reference](https://docs.gtm.ai/reference/preparecontroller_prepare) for each
 kind's schema.
 

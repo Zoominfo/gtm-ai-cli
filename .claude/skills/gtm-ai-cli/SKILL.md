@@ -276,7 +276,7 @@ gtm dq segment --config-ids <configId> --file ./leads.json
 gtm dq configs create segment --file ./territories.json               # file = the config's attributes
 ```
 
-`prepare` results are positional (`data[i]` is value `i`; failures are `PrepareError` resources in place). Validation is structural only: `isValid` does not mean an email won't bounce or is safe to send to; `--verify` checks deliverability and `--threat` flags unsafe addresses. Component objects work for phone, email, address, and person-name; the other types take strings only. Config IDs come from `configs list`; never guess them. When updating a score or segment config, send the complete config (fetch it with `configs get`, edit, then `configs update`) — omitted elements or segments may not be preserved.
+`prepare` results are positional (`data[i]` is value `i`; failures are `PrepareError` resources in place). Validation is structural only: `isValid` does not mean an email won't bounce or is safe to send to; `--verify` checks deliverability and `--threat` flags unsafe addresses. Component objects work for phone, email, address, and person-name; the other types take strings only. Config IDs come from `configs list`; never guess them. `configs update` changes only the attributes in the file, but a list you send (score `elements`, segment `segments`) replaces the whole list: to change one element or segment, fetch the config with `configs get` and send the full list you want to end up with.
 
 ### Exports — send records to connected systems
 

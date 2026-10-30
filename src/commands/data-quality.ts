@@ -189,10 +189,10 @@ export function registerDataQuality(program: Command): void {
 
   configs
     .command('update')
-    .description('Update a config from a JSON file of its attributes (send the complete config for score and segment configs)')
+    .description('Update a config with the attributes in a JSON file (omitted attributes are kept; a list you send, such as segments, replaces the whole list)')
     .addArgument(kindArgument())
     .requiredOption('--id <id>', 'Config ID from `gtm data-quality configs list`')
-    .requiredOption('--file <path>', 'JSON object of config attributes')
+    .requiredOption('--file <path>', 'JSON object of the config attributes to change')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
     .action(async (kind: ConfigKind, opts: OutputOptions & { id: string; file: string }) => {
