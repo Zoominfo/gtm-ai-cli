@@ -1,7 +1,7 @@
 ---
 name: gtm-ai-cli
 description: This skill should be used when searching for or enriching companies and contacts, surfacing buyer intent signals, fetching real-time business events (scoops) or company news, browsing engagement history (meetings, emails) or asking conversation-intelligence questions, reading or updating GTM context (offerings, ICPs, personas, competitors), looking up reference values (industries, metros, intent topics, tech products), cleaning, segmenting, or scoring the user's own records with Data Quality, sending records to a connected system with exports, or doing any ZoomInfo / GTM data lookup from the terminal. Activates when the user asks to "find companies", "search contacts", "enrich a contact", "find lookalike companies", "research a company / person", "get intent signals", "find scoops", "fetch company news", "what's happening at this account", "what did they say on the call", "show our GTM context", "look up industry codes", "clean / normalize these emails or phone numbers", "score / segment these leads", "export these accounts to our CRM", or any task involving ZoomInfo data lookup from the terminal.
-version: 0.3.0
+version: 0.4.0
 ---
 
 # GTM AI CLI Skill
@@ -261,11 +261,14 @@ When creating an audience from ZoomInfo search criteria, pass the exact search i
 
 ### Data Quality — prepare, segment, and score the user's own records
 
-Data Quality (beta) cleans records the user brings (emails, phones, addresses, job titles, person names), sorts them into segments, and scores them, returning results inline. Default prepare steps are free; `--line-type`, `--verify`, `--config-id` / `--rules`, `score`, and `segment` use credits, so confirm with the user before running those on more than a handful of records. Limits per call: 30 values for `prepare`, 25 records and 10 configs for `score` / `segment`.
+Data Quality (beta) cleans records the user brings (emails, phones, addresses, job titles, person names, company names, URLs), sorts them into segments, and scores them, returning results inline. Default prepare steps are free; the enrichments (`--line-type`, `--verify`, `--threat`, `--threat-type`, `--classify`), `--config-id` / `--rules`, `score`, and `segment` use credits, so confirm with the user before running those on more than a handful of records. Limits per call: 30 values for `prepare`, 25 records and 10 configs for `score` / `segment`.
 
 ```bash
 gtm dq prepare email " Jane.Doe@Example.COM " --select input.email,value.fullEmail,isValid   # free
+gtm dq prepare company-name "Acme Holdings, Inc." --select value.companyName   # free; legal suffixes go to value.corporateIdentifiers
 gtm dq prepare phone --file ./phones.json --line-type                 # JSON array of strings or component objects
+gtm dq prepare email --file ./emails.json --verify --threat-type      # deliverability + why an address is unsafe (adds --threat)
+gtm dq prepare job-title "VP of Sales" --classify                     # department, job function, management level, board member
 gtm dq prepare phone "+1 617 555 0123" --rules ./rules.json           # { "phone": [{ "type": "INT_FORMAT", "value": "E164" }] }
 gtm dq configs list score                                             # kinds: normalize | score | segment
 gtm dq score --config-ids <configId> --file ./leads.json              # records keyed by the fields the config uses
@@ -273,7 +276,7 @@ gtm dq segment --config-ids <configId> --file ./leads.json
 gtm dq configs create segment --file ./territories.json               # file = the config's attributes
 ```
 
-`prepare` results are positional (`data[i]` is value `i`; failures are `PrepareError` resources in place). Validation is structural only: `isValid` does not mean an email won't bounce. Config IDs come from `configs list`; never guess them. When updating a score or segment config, send the complete config (fetch it with `configs get`, edit, then `configs update`) — omitted elements or segments may not be preserved.
+`prepare` results are positional (`data[i]` is value `i`; failures are `PrepareError` resources in place). Validation is structural only: `isValid` does not mean an email won't bounce or is safe to send to; `--verify` checks deliverability and `--threat` flags unsafe addresses. Component objects work for phone, email, address, and person-name; the other types take strings only. Config IDs come from `configs list`; never guess them. `configs update` changes only the attributes in the file, but a list you send (score `elements`, segment `segments`) replaces the whole list: to change one element or segment, fetch the config with `configs get` and send the full list you want to end up with.
 
 ### Exports — send records to connected systems
 
