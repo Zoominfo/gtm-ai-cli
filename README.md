@@ -134,15 +134,19 @@ gtm lookup --field management-levels -f table
 # Intent topics about cloud
 gtm lookup --field intent-topics --fuzzy cloud -f table
 
-# Tech-products requires a two-step lookup (vendor first, then products under that vendor)
+# Tech products need --vendor, --category, or --parent-category: look the vendor up first...
 gtm lookup --field tech-vendors --fuzzy hubspot
 gtm lookup --field tech-products --vendor "HubSpot, Inc"
+# ...or list a whole category (categories come from `--field tech-categories`)
+gtm lookup --field tech-products --category "Customer Relationship Management"
 
 # Metro regions in California
 gtm lookup --field metro-regions --fuzzy "san francisco"
 ```
 
 Valid `--field` names: `industries`, `metro-regions`, `states`, `countries`, `continents`, `management-levels`, `departments`, `job-functions`, `employee-count`, `revenue-ranges`, `funding-round-types`, `company-types`, `company-rankings`, `intent-topics`, `scoop-topics`, `scoop-types`, `scoop-departments`, `news-categories`, `naics-codes`, `sic-codes`, `tech-vendors`, `tech-products`, `tech-categories`, `tech-skills`, `hashtags`, `buying-groups`, `board-members`, `years-of-experience`, `sub-unit-types`, `job-titles`.
+
+Job titles are free text, so there's nothing to look up: pass them straight to `gtm contacts search --job-title "A OR B"`. The `job-titles` field only returns the six management-level buckets. For seniority, use `management-levels`.
 
 ---
 
@@ -166,6 +170,8 @@ gtm companies search --tech "5f1d1d5c123" --metro "MA - Boston" --employees "250
 # US software companies whose most recent round was Series A or B
 # (use --any-funding-round to match any round in their history instead)
 gtm companies search --industry software --country "United States" --recent-funding-round "Series A,Series B"
+# (there's no funding-amount filter: to filter on amount, read totalFundingAmount / companyFunding
+#  from `companies enrich --fields`, which report amounts in thousands of USD)
 
 # By NAICS / SIC codes
 gtm companies search --naics "541511,541512"

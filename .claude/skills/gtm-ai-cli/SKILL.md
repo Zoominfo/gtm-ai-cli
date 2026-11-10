@@ -43,15 +43,19 @@ gtm lookup --field management-levels -f table
 # Intent topics
 gtm lookup --field intent-topics --fuzzy cloud -f table
 
-# Tech products require TWO lookups: vendor first, then products under that vendor
+# Tech products need --vendor, --category, or --parent-category: look the vendor up first...
 gtm lookup --field tech-vendors --fuzzy hubspot
 gtm lookup --field tech-products --vendor "HubSpot, Inc"
+# ...or list a whole category (categories come from `--field tech-categories`)
+gtm lookup --field tech-products --category "Customer Relationship Management"
 
 # Metro regions (US + Canada only)
 gtm lookup --field metro-regions --fuzzy "san francisco"
 ```
 
 Valid `--field` values: `industries`, `metro-regions`, `states`, `countries`, `continents`, `management-levels`, `departments`, `job-functions`, `employee-count`, `revenue-ranges`, `funding-round-types`, `company-types`, `company-rankings`, `intent-topics`, `scoop-topics`, `scoop-types`, `scoop-departments`, `news-categories`, `naics-codes`, `sic-codes`, `tech-vendors`, `tech-products`, `tech-categories`, `tech-skills`, `hashtags`, `buying-groups`, `board-members`, `years-of-experience`, `sub-unit-types`, `job-titles`.
+
+Job titles are free text, so there's nothing to look up: pass them straight to `contacts search --job-title "A OR B"`. The `job-titles` field only returns the six management-level buckets, so a `--fuzzy` title search on it always finds 0. For seniority, use `management-levels`.
 
 The response is keyed by field name: `.<fieldName>.data[]` where each entry is `{ attributes: { name }, id, type }`. Pass the `id` value (not `attributes.name`) into search filters.
 
@@ -71,6 +75,8 @@ gtm companies search --naics "541511,541512"
 ```
 
 Common filters: `--name`, `--domain`, `--industry` (lookup `id` values, e.g. `software.health`), `--metro`, `--state`, `--country`, `--continent`, `--zip`, `--zip-radius` (10|25|50|100|250 miles), `--employees`, `--employees-min`/`-max`, `--revenue`, `--revenue-min`/`-max`, `--type`, `--ticker`, `--tech`, `--naics`, `--sic`, `--recent-funding-round` / `--any-funding-round` (lookup `funding-round-types`; pass one, not both), `--sort`, `--page`, `--page-size`. Run with no flags to see the full list and a guidance error.
+
+There's no funding-amount filter. To filter on funding, narrow the search first (e.g. `--any-funding-round Debt`), then read `totalFundingAmount` and `companyFunding` (each round's type, amount, and date) with `companies enrich --fields`, and filter those. Funding amounts are in thousands of USD, so $50M is `50000`.
 
 **Enrich.** Provide any identifier (most accurate: `--id`).
 
@@ -436,5 +442,5 @@ Pagination lives at `.meta.page.{number, total}` and `.meta.totalResults` for se
 - **Bulk enrich caps at 10 entries per call.** Prefer `enrich --file` (one MCP call for up to 10 identifiers) over looping. For larger sets, batch into chunks of 10.
 - **For high-volume calls, prefer in this order:** (1) native bulk `enrich --file`; (2) bounded shell parallelism (`xargs -P4` / `parallel -j4`); (3) a sequential loop sleeping **at most 1 second** between calls. Use bounded parallelism **or** the ≤1s-sleep loop, never both, and never unbounded fan-out — both guards exist to respect the subscription's rate limits. See the callout at the top of *Common multi-step workflows*.
 - **Some MCP tools double-encode their response payload** (the text content block is a JSON string of a JSON object). The CLI handles this transparently — agents shouldn't need to care.
-- **`lookup` for `tech-products` requires a two-step flow:** first lookup `tech-vendors` with a fuzzy match, then lookup `tech-products` with `--vendor "<exact vendor name>"`. Passing `--field tech-products` without `--vendor` returns nothing useful.
+- **`lookup` for `tech-products` needs `--vendor`, `--category`, or `--parent-category`**, and errors without one. For a vendor, look up `tech-vendors` with `--fuzzy` first and pass the exact name it returns. For a category, take a value from `--field tech-categories`.
 - **Compliance:** This skill drives ZoomInfo data. Apply data-minimization (only fetch what you need), respect the rate limits of the user's subscription tier, and never use the data for unsolicited bulk outreach without a legal basis. ZoomInfo's Terms of Service apply to everything accessed through this CLI.
