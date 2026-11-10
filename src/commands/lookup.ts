@@ -30,13 +30,23 @@ export function registerLookup(program: Command): void {
     .description('Get standardized reference values (industries, metros, management-levels, intent-topics, etc.)')
     .requiredOption('--field <names...>', `Field name(s) to look up. Valid: ${LOOKUP_FIELDS.join(', ')}`)
     .option('--fuzzy <text>', 'Filter results by partial name match (case-insensitive). Applies to the first --field.')
-    .option('--vendor <name>', 'For tech-products: filter by vendor name (use tech-vendors lookup first)')
-    .option('--category <name>', 'For hashtag lookups: narrow within a specific category')
-    .option('--parent-category <name>', 'For hashtag/tech lookups: filter by parent category')
+    .option('--vendor <name>', 'For tech-products: exact vendor name from `gtm lookup --field tech-vendors`')
+    .option('--category <name>', 'For tech-products: a category from `gtm lookup --field tech-categories`; for hashtags: narrow within a category')
+    .option('--parent-category <name>', 'For tech-products: a parent category (the `id` from `gtm lookup --field tech-categories`); for hashtags: filter by parent category')
     .option('--sub-category <name>', 'For hashtag/tech lookups: filter by sub-category')
     .option(...FORMAT_OPTION)
     .option(...SELECT_OPTION)
+    .addHelpText('after', '\ntech-products needs --vendor, --category, or --parent-category.')
     .action(async (opts: LookupOptions) => {
+      // job-titles only returns the six management-level buckets, all with the id "job-titles",
+      // so it can never resolve a title. Point at the free-text --job-title filter instead.
+      if (opts.field.includes('job-titles')) {
+        console.error(
+          'Note: job-titles only lists management-level buckets, not titles. Job titles are free text: pass them straight to '
+          + '`gtm contacts search --job-title "VP Sales OR CRO"`, and use `--field management-levels` for seniority.',
+        );
+      }
+
       const fields = opts.field.map((name, i) => {
         const obj: Record<string, unknown> = { fieldName: name };
         // fuzzyMatch applies per-field; only attach it to the first one to match the MCP semantics
